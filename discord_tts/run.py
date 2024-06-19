@@ -164,6 +164,46 @@ async def add(ctx: ApplicationContext, before: str, after: str, use_regex: bool 
     await ctx.respond(embed=embed)
 
 
+@bot.slash_command(name="delete", description="辞書を削除する")
+async def delete(ctx: ApplicationContext, before: str):
+    replacer = vm.replacers.get(ctx.guild.id)
+    if replacer is None:
+        dictionary.Dictionary.create_table(ctx.guild.id)
+        await ctx.respond("辞書が存在しません")
+        return
+    dictionary.Dictionary.delete_dictionary(ctx.guild.id, before)
+    vm.set_replacer(ctx.guild.id)
+    embed = Embed(title="辞書削除", description=f"### 単語\n# ```{before}```")
+    await ctx.respond(embed=embed)
+
+
+@bot.slash_command(name="list", description="辞書を表示する")
+async def dictionary_list(ctx: ApplicationContext):
+    replacer = vm.replacers.get(ctx.guild.id)
+    if replacer is None:
+        dictionary.Dictionary.create_table(ctx.guild.id)
+        await ctx.respond("辞書が存在しません")
+        return
+    data = dictionary.Dictionary.fetch_dictionaries(ctx.guild.id)
+    res = ""
+    for d in data:
+        res += f"### 単語\n# ```{d[1]}```\n### 読み\n# ```{d[2]}```\n### 正規表現: {'使用する' if d[3] else '使用しない'}\n"
+    await ctx.respond(res)
+
+
+@bot.slash_command(name="update", description="辞書を更新する")
+async def update(ctx: ApplicationContext, old_before: str, new_before: str, after: str, use_regex: bool = False):
+    replacer = vm.replacers.get(ctx.guild.id)
+    if replacer is None:
+        dictionary.Dictionary.create_table(ctx.guild.id)
+        await ctx.respond("辞書が存在しません")
+        return
+    dictionary.Dictionary.update_dictionary(ctx.guild.id, old_before, new_before, after, use_regex)
+    vm.set_replacer(ctx.guild.id)
+    embed = Embed(title="辞書更新",
+                  description=f"### 変更前単語\n```{old_before}```\n### 単語\n# ```{new_before}```\n### 読み\n# ```{after}```\n### 正規表現: {'使用する' if use_regex else '使用しない'}")
+    await ctx.respond(embed=embed)
+
 def run(token: str):
     bot.run(token)
 
