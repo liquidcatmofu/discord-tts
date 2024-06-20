@@ -44,10 +44,6 @@ class VoiceVox:
     port: int = 50021
     process = None
 
-    # def __init__(self):
-    #     self.host = "127.0.0.1"
-    #     self.port = 50021
-
     @classmethod
     def set_host(cls, host: str | None = None, port: int | None = None) -> None:
         if host is not None:
@@ -115,25 +111,6 @@ class VoiceVox:
         ret = requests.get(f'http://{cls.host}:{cls.port}/speaker_info', params=query)
         # pprint(ret.json())
         return ret.json()
-
-
-# async def async_vvox_test(text):
-#     # 音声化する文言と話者を指定(3で標準ずんだもんになる)
-#     params = {
-#         'text': text,
-#         'speaker': 3
-#     }
-#
-#     # aiohttpのセッションを使用して非同期リクエストを行う
-#     async with aiohttp.ClientSession() as session:
-#         # 音声合成用のクエリ作成
-#         async with session.post(f'http://{host}:{port}/audio_query', json=params) as query_response:
-#             query_data = await query_response.json()
-#             print(query_data)
-#
-#             # 音声合成を実施
-#             async with session.post(f'http://{host}:{port}/synthesis', headers={"Content-Type": "application/json"}, json=query_data) as synthesis_response:
-#                 return await synthesis_response.read()
 
 
 if __name__ == "__main__":

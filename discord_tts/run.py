@@ -30,6 +30,7 @@ dictionary.Dictionary.set_db_path(os.path.join(os.path.dirname(os.path.abspath(_
 
 group_dictionary = SlashCommandGroup("dictionary", "辞書操作コマンド", guild_ids=[test_guild])
 
+
 @bot.event
 async def on_ready():
     print(f"logged in as {bot.user}")
@@ -104,9 +105,6 @@ async def join(
         vm.read_channel = ctx.channel
         vm.qclear()
         vm.speak("接続しました")
-        # data = call.vvox_test("接続しました")
-        # i = io.BytesIO(data)
-        # vm.voice_client.play(discord.FFmpegOpusAudio(i, pipe=True))
         say_clock.start()
         vm.start_converter()
 

@@ -8,7 +8,6 @@ import discord
 from vv_wrapper import call, dictionary
 
 
-
 class VoiceManager:
     def __init__(self, bot: discord.Bot):
         self.bot: discord.Bot = bot

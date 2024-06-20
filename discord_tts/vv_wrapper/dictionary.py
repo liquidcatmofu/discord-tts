@@ -10,12 +10,10 @@ class EfficientReplacer:
     def __init__(self, regex_replacements: dict[str: str], simple_replacements: dict[str: str]) -> None:
         self.regex_replacements: dict[str: str] = regex_replacements
         self.simple_replacements: dict[str: str] = simple_replacements
-        # self.compiled_regex: re.Pattern = re.compile('|'.join(f'({re.escape(k)})' for k in self.regex_replacements))
 
     def replace(self, text: str) -> str:
         print(self.regex_replacements)
         # 正規表現を使用する置換を一括で実行
-        # text = self.compiled_regex.sub(lambda m: self.regex_replacements[m.group(0)], text)
         for before, after in self.regex_replacements.items():
             text = re.sub(before, after, text)
             print("#regex", before, after, text)
@@ -23,13 +21,12 @@ class EfficientReplacer:
         for before, after in self.simple_replacements.items():
             text = text.replace(before, after)
             print("#simple", before, after, text)
-        print(text)
+        # print(text)
         return text
 
     def update_replacements(self, regex_replacements: dict[str: str], simple_replacements: dict[str: str]) -> None:
         self.regex_replacements: dict[str: str] = regex_replacements
         self.simple_replacements: dict[str: str] = simple_replacements
-        # self.compiled_regex: re.Pattern = re.compile('|'.join(f'({re.escape(k)})' for k in self.regex_replacements))
 
 
 class Dictionary:
@@ -138,19 +135,3 @@ class Dictionary:
         finally:
             db.close()
         return data
-
-    # @staticmethod
-    # def replace(cls, ):
-
-
-
-
-# # ユーザーの入力を受け取る
-# pattern = input("置換する文字列の正規表現パターンを入力してください: ")
-# replacement = input("新しい文字列を入力してください: ")
-# text = input("対象のテキストを入力してください: ")
-#
-# # 正規表現に合致する文字列を置換
-# replaced_text = re.sub(pattern, replacement, text)
-#
-# print(f"置換後のテキスト: {replaced_text}")
