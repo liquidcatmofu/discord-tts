@@ -20,16 +20,15 @@ intents = discord.Intents(
     message_content=True,
 )
 
-bot = discord.Bot(debug_guilds=[1064766843505610806], intents=intents)
-
-vm = voicemanager.VoiceManager(bot)
 load_dotenv(verbose=True)
 token = os.getenv("TOKEN")
+test_guild = int(os.getenv("GUILD_ID"))
+bot = discord.Bot(debug_guilds=[test_guild], intents=intents)
+
+vm = voicemanager.VoiceManager(bot)
 dictionary.Dictionary.set_db_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dictionary.db"))
 
-# call.start_engine(r"C:\Program Files\VOICEVOX\vv-engine\run.exe")
-
-commandgroup_dictionary = SlashCommandGroup("dictionary", "辞書操作コマンド", guild_ids=[1064766843505610806])
+group_dictionary = SlashCommandGroup("dictionary", "辞書操作コマンド", guild_ids=[test_guild])
 
 @bot.event
 async def on_ready():
@@ -152,7 +151,7 @@ async def speakers(ctx: ApplicationContext):
     await ctx.respond(res)
 
 
-@bot.slash_command(name="add", description="辞書を追加する")
+@group_dictionary.command(name="add", description="辞書を追加する")
 async def add(ctx: ApplicationContext, before: str, after: str, use_regex: bool = False):
     replacer = vm.replacers.get(ctx.guild.id)
     if replacer is None:
@@ -164,7 +163,7 @@ async def add(ctx: ApplicationContext, before: str, after: str, use_regex: bool 
     await ctx.respond(embed=embed)
 
 
-@bot.slash_command(name="delete", description="辞書を削除する")
+@group_dictionary.command(name="delete", description="辞書を削除する")
 async def delete(ctx: ApplicationContext, before: str):
     replacer = vm.replacers.get(ctx.guild.id)
     if replacer is None:
@@ -177,7 +176,7 @@ async def delete(ctx: ApplicationContext, before: str):
     await ctx.respond(embed=embed)
 
 
-@bot.slash_command(name="list", description="辞書を表示する")
+@group_dictionary.command(name="list", description="辞書を表示する")
 async def dictionary_list(ctx: ApplicationContext):
     replacer = vm.replacers.get(ctx.guild.id)
     if replacer is None:
@@ -185,13 +184,14 @@ async def dictionary_list(ctx: ApplicationContext):
         await ctx.respond("辞書が存在しません")
         return
     data = dictionary.Dictionary.fetch_dictionaries(ctx.guild.id)
+    await ctx.respond(f"{len(data)}件の辞書が登録されています\n")
     res = ""
     for d in data:
-        res += f"### 単語\n# ```{d[1]}```\n### 読み\n# ```{d[2]}```\n### 正規表現: {'使用する' if d[3] else '使用しない'}\n"
-    await ctx.respond(res)
+        res += f"単語\n## ```{d[1]}```\n読み\n## ```{d[2]}```\n正規表現: {'使用する' if d[3] else '使用しない'}\n\n"
+    await ctx.channel.send(res)
 
 
-@bot.slash_command(name="update", description="辞書を更新する")
+@group_dictionary.command(name="update", description="辞書を更新する")
 async def update(ctx: ApplicationContext, old_before: str, new_before: str, after: str, use_regex: bool = False):
     replacer = vm.replacers.get(ctx.guild.id)
     if replacer is None:
@@ -203,6 +203,9 @@ async def update(ctx: ApplicationContext, old_before: str, new_before: str, afte
     embed = Embed(title="辞書更新",
                   description=f"### 変更前単語\n```{old_before}```\n### 単語\n# ```{new_before}```\n### 読み\n# ```{after}```\n### 正規表現: {'使用する' if use_regex else '使用しない'}")
     await ctx.respond(embed=embed)
+
+
+bot.add_application_command(group_dictionary)
 
 def run(token: str):
     bot.run(token)
