@@ -9,9 +9,9 @@ from discord import ApplicationContext, ChannelType, Embed
 from discord.abc import GuildChannel
 from discord.ext import commands, tasks
 from discord.commands import slash_command, SlashCommandGroup, Option
-from vv_wrapper import call, dictionary
+from vv_wrapper import call, database
 import voicemanager
-
+from pprint import pprint
 intents = discord.Intents(
     messages=True,
     guilds=True,
@@ -22,21 +22,22 @@ intents = discord.Intents(
 
 load_dotenv(verbose=True)
 token = os.getenv("TOKEN")
-test_guild = int(os.getenv("GUILD_ID"))
-bot = discord.Bot(debug_guilds=[test_guild], intents=intents)
+test_guild = [i for i in map(int, os.getenv("TEST_GUILD").split(","))]
+bot = discord.Bot(debug_guilds=test_guild, intents=intents)
 
 vm = voicemanager.VoiceManager(bot)
-dictionary.Dictionary.set_db_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dictionary.db"))
+database.Dictionary.set_db_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dictionary.db"))
 
-group_dictionary = SlashCommandGroup("dictionary", "辞書操作コマンド", guild_ids=[test_guild])
+group_dictionary = SlashCommandGroup("dictionary", "辞書操作コマンド", guild_ids=test_guild)
 
 
 @bot.event
 async def on_ready():
     print(f"logged in as {bot.user}")
     print(f"guilds: {bot.guilds}")
+    database.SettingLoader.create_table()
     for guild in bot.guilds:
-        dictionary.Dictionary.create_table(guild.id)
+        database.Dictionary.create_table(guild.id)
         vm.set_replacer(guild.id)
     # await bot.change_presence()
 
@@ -44,6 +45,7 @@ async def on_ready():
 @bot.event
 async def on_message(message: discord.Message):
     print(message.guild, message.channel, message.content)
+    pprint(repr(message))
     if vm.read_channel is None:
         return
 
@@ -52,9 +54,7 @@ async def on_message(message: discord.Message):
 
     if message.author.bot:
         return
-    messages = message.content.split("\n")
-    for mes in messages:
-        vm.speak_text_q.put((mes, message.guild.id, message.author.id))
+    vm.speak_message_q.put(message)
 
 
 @tasks.loop(seconds=0.5)
@@ -104,7 +104,7 @@ async def join(
         await vm.connect(channel)
         vm.read_channel = ctx.channel
         vm.qclear()
-        vm.speak("接続しました")
+        vm.speak("接続しました", guild=ctx.guild.id)
         say_clock.start()
         vm.start_converter()
 
@@ -153,8 +153,8 @@ async def speakers(ctx: ApplicationContext):
 async def add(ctx: ApplicationContext, before: str, after: str, use_regex: bool = False):
     replacer = vm.replacers.get(ctx.guild.id)
     if replacer is None:
-        dictionary.Dictionary.create_table(ctx.guild.id)
-    dictionary.Dictionary.add_dictionary(ctx.guild.id, before, after, use_regex)
+        database.Dictionary.create_table(ctx.guild.id)
+    database.Dictionary.add_dictionary(ctx.guild.id, before, after, use_regex)
     vm.set_replacer(ctx.guild.id)
     embed = Embed(title="辞書追加",
                   description=f"### 単語\n# ```{before}```\n### 読み\n# ```{after}```\n### 正規表現: {'使用する' if use_regex else '使用しない'}")
@@ -165,10 +165,10 @@ async def add(ctx: ApplicationContext, before: str, after: str, use_regex: bool 
 async def delete(ctx: ApplicationContext, before: str):
     replacer = vm.replacers.get(ctx.guild.id)
     if replacer is None:
-        dictionary.Dictionary.create_table(ctx.guild.id)
+        database.Dictionary.create_table(ctx.guild.id)
         await ctx.respond("辞書が存在しません")
         return
-    dictionary.Dictionary.delete_dictionary(ctx.guild.id, before)
+    database.Dictionary.delete_dictionary(ctx.guild.id, before)
     vm.set_replacer(ctx.guild.id)
     embed = Embed(title="辞書削除", description=f"### 単語\n# ```{before}```")
     await ctx.respond(embed=embed)
@@ -178,10 +178,10 @@ async def delete(ctx: ApplicationContext, before: str):
 async def dictionary_list(ctx: ApplicationContext):
     replacer = vm.replacers.get(ctx.guild.id)
     if replacer is None:
-        dictionary.Dictionary.create_table(ctx.guild.id)
+        database.Dictionary.create_table(ctx.guild.id)
         await ctx.respond("辞書が存在しません")
         return
-    data = dictionary.Dictionary.fetch_dictionaries(ctx.guild.id)
+    data = database.Dictionary.fetch_dictionaries(ctx.guild.id)
     await ctx.respond(f"{len(data)}件の辞書が登録されています\n")
     res = ""
     for d in data:
@@ -193,10 +193,10 @@ async def dictionary_list(ctx: ApplicationContext):
 async def update(ctx: ApplicationContext, old_before: str, new_before: str, after: str, use_regex: bool = False):
     replacer = vm.replacers.get(ctx.guild.id)
     if replacer is None:
-        dictionary.Dictionary.create_table(ctx.guild.id)
+        database.Dictionary.create_table(ctx.guild.id)
         await ctx.respond("辞書が存在しません")
         return
-    dictionary.Dictionary.update_dictionary(ctx.guild.id, old_before, new_before, after, use_regex)
+    database.Dictionary.update_dictionary(ctx.guild.id, old_before, new_before, after, use_regex)
     vm.set_replacer(ctx.guild.id)
     embed = Embed(title="辞書更新",
                   description=f"### 変更前単語\n```{old_before}```\n### 単語\n# ```{new_before}```\n### 読み\n# ```{after}```\n### 正規表現: {'使用する' if use_regex else '使用しない'}")
@@ -204,6 +204,7 @@ async def update(ctx: ApplicationContext, old_before: str, new_before: str, afte
 
 
 bot.add_application_command(group_dictionary)
+
 
 def run(token: str):
     bot.run(token)

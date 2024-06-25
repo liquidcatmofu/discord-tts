@@ -3,6 +3,7 @@ import subprocess
 import requests
 import json
 from pprint import pprint
+from vv_wrapper import database as db
 
 host = "127.0.0.1"
 port = 50021
@@ -50,6 +51,17 @@ class VoiceVox:
             cls.host = host
         if port is not None:
             cls.port = port
+
+    @classmethod
+    def synth_from_settings(cls, text: str, settings: db.BaseSetting) -> bytes:
+        return cls.synthesize(
+            text,
+            settings.speaker,
+            settings.speed,
+            settings.pitch,
+            settings.intonation,
+            settings.volume
+        )
 
     @classmethod
     def synthesize(
