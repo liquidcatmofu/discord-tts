@@ -1,4 +1,5 @@
 import aiohttp
+from dataclasses import dataclass
 import subprocess
 import requests
 import json
@@ -38,6 +39,41 @@ def vv_synthesis(text: str, speaker: int = 3, speed: float = 1.0, pitch: float =
         data=json.dumps(query_json)
     )
     return synthesis.content
+
+
+@dataclass
+class SpeakerStyle:
+    id: int
+    name: str
+    type: str
+
+    def __str__(self):
+        return self.name
+
+
+@dataclass
+class Speaker:
+    name: str
+    speaker_uuid: str
+    styles: list[SpeakerStyle]
+
+    def __str__(self):
+        return self.name
+
+    def styles_dict(self) -> dict[str: int]:
+        return {f"{self.name} ({style.name})": style.id for style in self.styles}
+
+
+@dataclass
+class SpeakersHolder:
+    speakers: list[Speaker]
+
+    def styles(self) -> dict[str: int]:
+        d = {}
+        for speaker in self.speakers:
+            d.update(speaker.styles_dict())
+        print("test", d)
+        return d
 
 
 class VoiceVox:
@@ -112,10 +148,20 @@ class VoiceVox:
         return synthesis.content
 
     @classmethod
-    def getspeakers(cls) -> dict:
+    def get_speakers_raw(cls) -> dict:
         ret = requests.get(f'http://{cls.host}:{cls.port}/speakers')
-        pprint(ret.json())
+        # pprint(ret.json())
         return ret.json()
+
+    @classmethod
+    def get_speakers(cls) -> SpeakersHolder:
+        speakers = []
+        for s in cls.get_speakers_raw():
+            styles = [SpeakerStyle(i["id"], i["name"], i["type"]) for i in s["styles"]]
+            speakers.append(
+                Speaker(s["name"], s["speaker_uuid"], styles)
+            )
+        return SpeakersHolder(speakers)
 
     @classmethod
     def spekerdata(cls, speaker_uuid: str) -> dict[str:str | list | dict]:
@@ -126,8 +172,8 @@ class VoiceVox:
 
 
 if __name__ == "__main__":
-    data = VoiceVox.getspeakers()
+    data = VoiceVox.get_speakers_raw()
     pprint(data)
-    info = VoiceVox.spekerdata(data[0]['speaker_uuid'])
-    print(info["policy"])
+    # info = VoiceVox.spekerdata(data[0]['speaker_uuid'])
+    # print(info["policy"])
     # pprint(info["style_infos"])

@@ -8,6 +8,12 @@ import discord
 from vv_wrapper import call, database
 
 
+class VoiceManagedBot(discord.Bot):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.voice_manager: VoiceManager = VoiceManager(self)
+
+
 class VoiceManager:
     def __init__(self, bot: discord.Bot):
         self.bot: discord.Bot = bot
@@ -20,11 +26,33 @@ class VoiceManager:
         self.converter_loop: bool = True
         self.converter_thread: threading.Thread | None = None
 
-        self.replacers: dict[int: database.Replacer] = {}
-        self.user_replacers: dict[int: database.Replacer] = {}
+        self.user_replacers: database.ReplacerHolder = database.ReplacerHolder("user", {})
+        self.guild_replacers: database.ReplacerHolder = database.ReplacerHolder("guild", {})
 
-        self.user_settings: dict[int: database.BaseSetting] = {}
-        self.guild_settings: dict[int: database.BaseSetting] = {}
+        self.user_settings: database.SettingHolder = database.SettingHolder("users", {})
+        self.guild_settings: database.SettingHolder = database.SettingHolder("guilds", {})
+
+        # self.speakers: dict[str: dict[str: str]] = {}
+
+    @property
+    def speakers(self) -> call.SpeakersHolder:
+        return call.VoiceVox.get_speakers()
+
+    # @property
+    # def user_settings(self) -> dict[int: database.BaseSetting]:
+    #     if self.user_settings is None:
+    #         self.user_settings = database.SettingLoader.smart_fetch("users", )
+    #     return self.user_settings
+    #
+    # @user_settings.setter
+    # def user_settings(self, value: dict[int: database.BaseSetting]):
+    #     self.user_settings = value
+
+
+    def get_user_setting(self, user_id: int) -> database.UserSetting:
+        if self.user_settings.get(user_id) is None:
+            self.user_settings[user_id] = database.SettingLoader.smart_fetch(user_id, "users", True)
+        return self.user_settings[user_id]
 
     @staticmethod
     def _set_replacer(data: list[tuple[int, str, str, bool]]) -> tuple[dict[str, str], dict[str, str]]:
@@ -43,18 +71,20 @@ class VoiceManager:
 
     def set_replacer(self, guild_id: int) -> None:
         # for guild_id in guild_ids:
-        try:
-            print("try")
-            data = database.Dictionary.fetch_dictionaries(guild_id, "guild")
-        except sqlite3.OperationalError:
-            database.Dictionary.create_table(guild_id)
-            data = database.Dictionary.fetch_dictionaries(guild_id)
-        print(data)
-        regex, simple = self._set_replacer(data)
-        if self.replacers.get(guild_id) is None:
-            self.replacers[guild_id] = database.Replacer(regex, simple)
-        else:
-            self.replacers[guild_id].update_replacements(regex, simple)
+        self.guild_replacers.auto_load(guild_id)
+        # self.guild_replacers[guild_id] = database.DictionaryLoader.auto_read(guild_id, "guild")
+        # try:
+        #     print("try")
+        #     data = database.DictionaryLoader.fetch_dictionaries(guild_id, "guild")
+        # except sqlite3.OperationalError:
+        #     database.DictionaryLoader.create_table(guild_id)
+        #     data = database.DictionaryLoader.fetch_dictionaries(guild_id)
+        # print(data)
+        # regex, simple = self._set_replacer(data)
+        # if self.guild_replacers.get(guild_id) is None:
+        #     self.guild_replacers[guild_id] = database.Replacer(regex, simple)
+        # else:
+        #     self.guild_replacers[guild_id].update_replacements(regex, simple)
 
     def set_replacers(self, guild_ids: list[int]) -> None:
         for guild_id in guild_ids:
@@ -86,20 +116,19 @@ class VoiceManager:
         self.start_converter()
         return self.voice_client
 
-    def _user_replacer(self, user_id: int) -> database.Replacer:
-        try:
-            u = database.Dictionary.fetch_dictionaries(user_id, "user")
-        except sqlite3.OperationalError:
-            database.Dictionary.create_table(user_id, "user")
-            u = database.Dictionary.fetch_dictionaries(user_id, "user")
-        regex, simple = self._set_replacer(u)
-        return database.Replacer(regex, simple)
+    # def _user_replacer(self, user_id: int) -> database.Replacer:
+    #     try:
+    #         u = database.DictionaryLoader.fetch_dictionaries(user_id, "user")
+    #     except sqlite3.OperationalError:
+    #         database.DictionaryLoader.create_table(user_id, "user")
+    #         u = database.DictionaryLoader.fetch_dictionaries(user_id, "user")
+    #     regex, simple = self._set_replacer(u)
+    #     return database.Replacer(regex, simple)
 
     def _converter(self):
         while self.converter_loop:
-            userdict: database.Replacer | None = None
             user_settings: database.UserSetting | None = None
-            server_settings: database.ServerSetting | None = None
+            server_settings: database.GuildSetting | None = None
             message_type: discord.MessageType | None = None
             reply: str = ""
             try:
@@ -118,35 +147,27 @@ class VoiceManager:
             except Empty:
                 continue
 
-            if message_type == discord.MessageType.reply:
-                if server_settings.read_replyuser:
-                    reply += f"{self.bot.get_message(message.reference.message_id).author.display_name}へ"
-                reply += f"リプライ、"
+            if guild is not None:
+                server_settings = self.guild_settings.get(guild)
 
             print(text, guild, user)
             if user is not None:
                 userdict = self.user_replacers.get(user)
+                if message_type == discord.MessageType.reply:
+                    if server_settings.read_replyuser:
+                        reply += f"{self.bot.get_message(message.reference.message_id).author.display_name}へ"
+                    reply += f"リプライ、"
+
                 user_settings = self.user_settings.get(user)
-                if userdict is None:
-                    userdict = self.user_replacers[user] = self._user_replacer(user)
-                if user_settings is None:
-                    user_settings = self.user_settings[user] = database.SettingLoader.smart_fetch("users", user)
-                    if user_settings is None:
-                        database.SettingLoader.add_setting("users", user)
-                        user_settings = self.user_settings[user] = database.SettingLoader.smart_fetch("users", user)
                 reply = userdict.replace(reply)
                 text = userdict.replace(text)
 
             if guild is not None:
-                server_settings = self.guild_settings.get(guild)
-                if server_settings is None:
-                    server_settings = self.guild_settings[guild] = database.SettingLoader.smart_fetch("guilds", guild)
-                    if server_settings is None:
-                        database.SettingLoader.add_setting("guilds", guild)
-                        server_settings = self.guild_settings[guild] = database.SettingLoader.smart_fetch("guilds",
-                                                                                                          guild)
-                print(self.replacers)
-                text = self.replacers.get(guild, database.Replacer({}, {})).replace(text)
+                print(server_settings)
+                print(self.guild_replacers)
+                text = self.guild_replacers.get(guild).replace(text)
+
+
 
             text = reply + text
             print(server_settings, "\n", user_settings)
@@ -161,7 +182,6 @@ class VoiceManager:
             self.speak_source_q.put(source)
 
             time.sleep(0.3)
-
 
     def start_converter(self):
         self.converter_loop = True
