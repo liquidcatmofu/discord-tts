@@ -169,11 +169,3 @@ class VoiceVox:
         ret = requests.get(f'http://{cls.host}:{cls.port}/speaker_info', params=query)
         # pprint(ret.json())
         return ret.json()
-
-
-if __name__ == "__main__":
-    data = VoiceVox.get_speakers_raw()
-    pprint(data)
-    # info = VoiceVox.spekerdata(data[0]['speaker_uuid'])
-    # print(info["policy"])
-    # pprint(info["style_infos"])

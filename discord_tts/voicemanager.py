@@ -1,7 +1,5 @@
-import asyncio
 import io
 from queue import Empty, Queue
-import sqlite3
 import threading
 import time
 import discord
@@ -32,21 +30,9 @@ class VoiceManager:
         self.user_settings: database.SettingHolder = database.SettingHolder("users", {})
         self.guild_settings: database.SettingHolder = database.SettingHolder("guilds", {})
 
-        # self.speakers: dict[str: dict[str: str]] = {}
-
     @property
     def speakers(self) -> call.SpeakersHolder:
         return call.VoiceVox.get_speakers()
-
-    # @property
-    # def user_settings(self) -> dict[int: database.BaseSetting]:
-    #     if self.user_settings is None:
-    #         self.user_settings = database.SettingLoader.smart_fetch("users", )
-    #     return self.user_settings
-    #
-    # @user_settings.setter
-    # def user_settings(self, value: dict[int: database.BaseSetting]):
-    #     self.user_settings = value
 
 
     def get_user_setting(self, user_id: int) -> database.UserSetting:
@@ -54,37 +40,8 @@ class VoiceManager:
             self.user_settings[user_id] = database.SettingLoader.smart_fetch(user_id, "users", True)
         return self.user_settings[user_id]
 
-    @staticmethod
-    def _set_replacer(data: list[tuple[int, str, str, bool]]) -> tuple[dict[str, str], dict[str, str]]:
-        regex_replacements = {}
-        simple_replacements = {}
-        for d in data:
-            print("data:", d)
-            before = d[1]
-            after = d[2]
-            use_regex = d[3]
-            if use_regex:
-                regex_replacements[before] = after
-            else:
-                simple_replacements[before] = after
-        return regex_replacements, simple_replacements
-
     def set_replacer(self, guild_id: int) -> None:
-        # for guild_id in guild_ids:
         self.guild_replacers.auto_load(guild_id)
-        # self.guild_replacers[guild_id] = database.DictionaryLoader.auto_read(guild_id, "guild")
-        # try:
-        #     print("try")
-        #     data = database.DictionaryLoader.fetch_dictionaries(guild_id, "guild")
-        # except sqlite3.OperationalError:
-        #     database.DictionaryLoader.create_table(guild_id)
-        #     data = database.DictionaryLoader.fetch_dictionaries(guild_id)
-        # print(data)
-        # regex, simple = self._set_replacer(data)
-        # if self.guild_replacers.get(guild_id) is None:
-        #     self.guild_replacers[guild_id] = database.Replacer(regex, simple)
-        # else:
-        #     self.guild_replacers[guild_id].update_replacements(regex, simple)
 
     def set_replacers(self, guild_ids: list[int]) -> None:
         for guild_id in guild_ids:
@@ -116,16 +73,8 @@ class VoiceManager:
         self.start_converter()
         return self.voice_client
 
-    # def _user_replacer(self, user_id: int) -> database.Replacer:
-    #     try:
-    #         u = database.DictionaryLoader.fetch_dictionaries(user_id, "user")
-    #     except sqlite3.OperationalError:
-    #         database.DictionaryLoader.create_table(user_id, "user")
-    #         u = database.DictionaryLoader.fetch_dictionaries(user_id, "user")
-    #     regex, simple = self._set_replacer(u)
-    #     return database.Replacer(regex, simple)
-
     def _converter(self):
+        """Converts text to speech and puts it in the speak_source_q."""
         while self.converter_loop:
             user_settings: database.UserSetting | None = None
             server_settings: database.GuildSetting | None = None

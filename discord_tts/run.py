@@ -1,18 +1,16 @@
-import asyncio
 import io
 import os
 import queue
 import sqlite3
-import threading
 from dotenv import load_dotenv
 import discord
 from discord import ApplicationContext, ChannelType, Embed
 from discord.abc import GuildChannel
-from discord.ext import commands, tasks
-from discord.commands import slash_command, SlashCommandGroup, Option
+from discord.ext import tasks
+from discord.commands import SlashCommandGroup, Option
 from vv_wrapper import call, database
 import voicemanager
-from pprint import pprint
+
 intents = discord.Intents(
     messages=True,
     guilds=True,
@@ -21,15 +19,26 @@ intents = discord.Intents(
     message_content=True,
 )
 
-load_dotenv(verbose=True)
+if not load_dotenv(verbose=True):
+    with open(".env", "w", encoding="utf-8") as f:
+        f.write("TOKEN=\n")
+        f.write("TEST_GUILD=\n")
 token = os.getenv("TOKEN")
-test_guild = [i for i in map(int, os.getenv("TEST_GUILD").split(","))]
-bot = voicemanager.VoiceManagedBot(debug_guilds=test_guild, intents=intents)
+if not token:
+    print("Failed to load token")
+    raise FileNotFoundError("Failed to load token")
+if os.getenv("TEST_GUILD"):
+    print("Test Bot")
+    test_guild = [i for i in map(int, os.getenv("TEST_GUILD").split(","))]
+    bot = voicemanager.VoiceManagedBot(debug_guilds=test_guild, intents=intents)
+else:
+    print("Public Bot")
+    bot = voicemanager.VoiceManagedBot(intents=intents)
 
 vm = bot.voice_manager
 database.DictionaryLoader.set_db_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dictionary.db"))
 
-group_dictionary = SlashCommandGroup("dictionary", "辞書操作コマンド", guild_ids=test_guild)
+group_dictionary = SlashCommandGroup("dictionary", "辞書操作コマンド")
 
 
 @bot.event
@@ -40,7 +49,7 @@ async def on_ready():
     for guild in bot.guilds:
         database.DictionaryLoader.create_table(guild.id)
         vm.set_replacer(guild.id)
-        vm.guild_settings.auto_load(guild.id,)
+        vm.guild_settings.auto_load(guild.id, )
 
     # await bot.change_presence()
 
@@ -103,6 +112,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
 
 @tasks.loop(seconds=0.5)
 async def say_clock():
+    """Check if the bot is speaking and play the next source if it is not playing."""
     if not vm.voice_client.is_connected() or not vm.voice_client:
         await vm.stop()
         say_clock.stop()
@@ -186,7 +196,7 @@ async def speakers(ctx: ApplicationContext):
     a = call.VoiceVox.get_speakers_raw()
     res = ""
     for i in a:
-        res += f'### { i["name"]}\n'
+        res += f'### {i["name"]}\n'
         for j in i["styles"]:
             res += f'- {j["name"]} {j["id"]}\n'
 

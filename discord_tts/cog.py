@@ -1,9 +1,7 @@
 import discord
-from discord import ApplicationContext, ChannelType, Embed
-from discord.abc import GuildChannel
-from discord.ext import commands, tasks
+from discord import ApplicationContext, Embed
+from discord.ext import commands
 from discord.commands import slash_command, SlashCommandGroup, Option
-from vv_wrapper import call, database
 import voicemanager
 
 styles: dict[str, str] = {}

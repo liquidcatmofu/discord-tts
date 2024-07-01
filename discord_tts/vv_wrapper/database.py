@@ -4,8 +4,6 @@ import re
 import sqlite3
 from urllib.parse import urlparse
 
-path = "../dictionary.db"
-
 
 class SQLiteWrapper:
     def __init__(self, database):
@@ -111,7 +109,8 @@ class DictionaryLoader:
     """
     dictionary database wrapper
     """
-    file_path: str | os.PathLike = path
+    file_path: str | os.PathLike = "../dictionary.db"
+
     # replacer: EfficientReplacer | None = None
 
     @classmethod
@@ -361,7 +360,8 @@ class ReplacerHolder(BaseDataHolder):
         self.auto_load(id)
 
     def update(self, id: int, old_before: str, new_before: str, after: str, use_regex: bool = False):
-        DictionaryLoader.update_dictionary(id, old_before, new_before, after, use_regex, type=self.table, auto_create=True)
+        DictionaryLoader.update_dictionary(id, old_before, new_before, after, use_regex, type=self.table,
+                                           auto_create=True)
         self.auto_load(id)
 
 
@@ -453,7 +453,7 @@ class SettingLoader:
                     f"INSERT INTO {table} (id, speaker, speed, pitch, intonation, volume, use_dict_name) "
                     f"VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (id, datas["speaker"], datas["speed"], datas["pitch"], datas["intonation"], datas["volume"],
-                        datas["use_dict_name"]))
+                     datas["use_dict_name"]))
             elif table == "guilds":
                 print(id)
                 db.execute(
@@ -461,9 +461,9 @@ class SettingLoader:
                     f" read_joinleave, read_length, read_nonparticipation, read_replyuser, ignore_users, ignore_roles) "
                     f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (id, datas["speaker"], datas["speed"], datas["pitch"], datas["intonation"], datas["volume"],
-                        datas["force_setting"], datas["force_speaker"], datas["read_joinleave"], datas["read_length"],
-                        datas["read_nonparticipation"], datas["read_replyuser"], datas["ignore_users"],
-                        datas["ignore_roles"]))
+                     datas["force_setting"], datas["force_speaker"], datas["read_joinleave"], datas["read_length"],
+                     datas["read_nonparticipation"], datas["read_replyuser"], datas["ignore_users"],
+                     datas["ignore_roles"]))
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
