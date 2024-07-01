@@ -101,6 +101,15 @@ class Replacer:
     def __iter__(self):
         return iter(self.regex_replacements_str.items() | self.simple_replacements.items())
 
+    def items(self):
+        return self.regex_replacements_str.items() | self.simple_replacements.items()
+
+    def keys(self):
+        return self.regex_replacements_str.keys() | self.simple_replacements.keys()
+
+    def values(self):
+        return self.regex_replacements_str.values() | self.simple_replacements.values()
+
 
 class DictionaryLoader:
     """

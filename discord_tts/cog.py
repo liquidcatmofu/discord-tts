@@ -301,6 +301,34 @@ class GuildCommands(commands.Cog):
         self.vm.guild_settings.update(guild_id, "read_replyuser", read_replyuser)
         await ctx.respond(f"リプライされたユーザーを読み上げる設定を{read_replyuser}に変更しました")
 
+    @guild_setting.command()
+    async def show_setting(
+            self,
+            ctx: ApplicationContext
+    ):
+        guild_id = ctx.guild.id
+        setting = self.vm.guild_settings.get(guild_id)
+        speaker = "不明"
+        for k, v in styles.items():
+            if v == setting.speaker:
+                speaker = k
+                break
+        embed = Embed(
+            title=f"{ctx.guild.name}の設定",
+            description=f"話者: {speaker}\n"
+                        f"再生速度: {setting.speed}\n"
+                        f"音程: {setting.pitch}\n"
+                        f"抑揚: {setting.intonation}\n"
+                        f"音量: {setting.volume}\n"
+                        f"参加/退出読み上げ: {bool(setting.read_joinleave)}\n"
+                        f"VC未参加ユーザー読み上げ: {bool(setting.read_nonparticipation)}\n"
+                        f"リプライユーザー読み上げ: {bool(setting.read_replyuser)}"
+        )
+        await ctx.respond(embed=embed)
+
+    # async def dictionary_autocomplete(self, ctx: discord.AutocompleteContext):
+    #     return list(self.vm.guild_replacers.get(ctx.guild.id).keys())
+
     @guild_dictionary.command(name="add", description="辞書を追加する")
     async def add(
             self,
