@@ -46,21 +46,19 @@ class Replacer:
             self,
             text: str,
             *,
-            url_replacement: str | None = "URL省略"
+            url_replacement: str | None = "URL省略",
+            code_block_replacement: str | None = "コード省略"
     ) -> str:
-        print(self.regex_replacements)
         # 正規表現を使用する置換を一括で実行
         for before, after in self.regex_replacements.items():
             text = before.sub(after, text)
-            # print("#regex", before, after, text)
         # 正規表現を使用しない置換を実行
         for before, after in self.simple_replacements.items():
             text = text.replace(before, after)
-            # print("#simple", before, after, text)
-        # print(text)
         if url_replacement:
             text = self.replace_urls(text, url_replacement)
-
+        if code_block_replacement:
+            text = self.replace_code_blocks(text, code_block_replacement)
         return text
 
     def update_replacements(self, regex_replacements: dict[str: str], simple_replacements: dict[str: str]) -> None:
@@ -73,12 +71,10 @@ class Replacer:
         # URLの正規表現パターン
         url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
         urls = re.findall(url_pattern, text)
-
         for url in urls:
             parsed_url = urlparse(url)
             if parsed_url.scheme and parsed_url.netloc:
                 text = text.replace(url, replacement)
-
         return text
 
     @staticmethod
@@ -86,11 +82,12 @@ class Replacer:
         # コードブロックの正規表現パターン
         code_block_pattern = r'```.*?```'
         code_blocks = re.findall(code_block_pattern, text, re.DOTALL)
-
         for code_block in code_blocks:
             text = text.replace(code_block, replacement)
-
         return text
+
+    # @staticmethod
+
 
     def __bool__(self):
         return bool(self.regex_replacements or self.simple_replacements)
@@ -205,26 +202,22 @@ class DictionaryLoader:
         :param type: database type
         :return: dictionaries
         """
-        print("fetch_dictionaries", id, type, auto_create)
         db = SQLiteWrapper(cls.file_path)
         create = False
         data = None
         try:
             data = db.execute(f"SELECT * FROM {type}{id}")
         except sqlite3.OperationalError as e:
-            print("OperationalError", e)
             if auto_create:
                 create = True
             else:
                 raise e
         finally:
             db.close()
-            # print(create, data)
         if not data and auto_create:
             create = True
         if create:
             cls.create_table(id, type)
-            print("create table")
             return cls.fetch_dictionaries(id, type, False)
         return data
 
@@ -250,7 +243,6 @@ class DictionaryLoader:
     @classmethod
     def smart_fetch(cls, id: int, type: str = "guild", auto_create: bool = False) -> Replacer:
         data = cls.fetch_dictionaries(id, type, auto_create)
-        print("smart_fetch", data)
         if not data:
             return Replacer({}, {})
         regex_replacements = {}
@@ -334,10 +326,8 @@ class ReplacerHolder(BaseDataHolder):
 
     def get(self, id: int, auto_fetch: bool = True, auto_create: bool = True) -> Replacer | None:
         i = self._replacers.get(id)
-        print(i)
         if i is None and auto_fetch:
             self._replacers[id] = DictionaryLoader.smart_fetch(id, self.table, auto_create)
-            print("auto fetch", self._replacers[id])
             return self._replacers.get(id)
         return self._replacers.get(id)
 
@@ -439,10 +429,10 @@ class SettingLoader:
     def add_setting(cls, table: str, id: int, **kwargs) -> None:
         db = SQLiteWrapper(cls.file_path)
         if table == "users":
-            datas = {"speaker": 3, "speed": 1.0, "pitch": 0.0, "intonation": 1.0, "volume": 1.0, "use_dict_name": 0}
+            datas = {"speaker": 3, "speed": 1.1, "pitch": 0.0, "intonation": 1.0, "volume": 1.0, "use_dict_name": 0}
         elif table == "guilds":
-            datas = {"speaker": 3, "speed": 1.0, "pitch": 0.0, "intonation": 1.0, "volume": 1.0, "force_setting": 0,
-                     "force_speaker": 0, "read_joinleave": 1, "read_length": 0, "read_nonparticipation": 0,
+            datas = {"speaker": 3, "speed": 1.1, "pitch": 0.0, "intonation": 1.0, "volume": 1.0, "force_setting": 0,
+                     "force_speaker": 0, "read_joinleave": 1, "read_length": 100, "read_nonparticipation": 0,
                      "read_replyuser": 0, "ignore_users": "", "ignore_roles": ""}
         else:
             raise ValueError(f"table name {table} is invalid")
@@ -455,7 +445,6 @@ class SettingLoader:
                     (id, datas["speaker"], datas["speed"], datas["pitch"], datas["intonation"], datas["volume"],
                      datas["use_dict_name"]))
             elif table == "guilds":
-                print(id)
                 db.execute(
                     f"INSERT INTO {table} (id, speaker, speed, pitch, intonation, volume, force_setting, force_speaker,"
                     f" read_joinleave, read_length, read_nonparticipation, read_replyuser, ignore_users, ignore_roles) "
@@ -534,7 +523,6 @@ class SettingLoader:
         if not data and auto_crate:
             create = True
         if create:
-            print("creating table")
             cls.add_setting(table, id)
             return cls.fetch_settings(table, id, False)
         else:

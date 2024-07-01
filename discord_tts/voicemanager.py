@@ -1,4 +1,5 @@
 import io
+import re
 from queue import Empty, Queue
 import threading
 import time
@@ -99,7 +100,6 @@ class VoiceManager:
             if guild is not None:
                 server_settings = self.guild_settings.get(guild)
 
-            print(text, guild, user)
             if user is not None:
                 userdict = self.user_replacers.get(user)
                 if message_type == discord.MessageType.reply:
@@ -112,23 +112,23 @@ class VoiceManager:
                 text = userdict.replace(text)
 
             if guild is not None:
-                print(server_settings)
-                print(self.guild_replacers)
                 text = self.guild_replacers.get(guild).replace(text)
-
-
+                if server_settings.read_length:
+                    if len(text) > server_settings.read_length:
+                        text = text[:server_settings.read_length] + "、以下省略"
 
             text = reply + text
-            print(server_settings, "\n", user_settings)
+            text = re.split("[。、\n]", text)
 
-            if user is not None:
-                wav = call.VoiceVox.synth_from_settings(text, user_settings)
-            elif guild is not None:
-                wav = call.VoiceVox.synth_from_settings(text, server_settings)
-            else:
-                wav = call.VoiceVox.synthesize(text)
-            source = discord.FFmpegOpusAudio(io.BytesIO(wav), pipe=True)
-            self.speak_source_q.put(source)
+            for t in text:
+                if user is not None:
+                    wav = call.VoiceVox.synth_from_settings(t, user_settings)
+                elif guild is not None:
+                    wav = call.VoiceVox.synth_from_settings(t, server_settings)
+                else:
+                    wav = call.VoiceVox.synthesize(t)
+                source = discord.FFmpegOpusAudio(io.BytesIO(wav), pipe=True)
+                self.speak_source_q.put(source)
 
             time.sleep(0.3)
 
