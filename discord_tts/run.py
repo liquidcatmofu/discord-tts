@@ -28,11 +28,11 @@ if not token:
     print("Failed to load token")
     raise FileNotFoundError("Failed to load token")
 if os.getenv("TEST_GUILD"):
-    print("Test Bot")
+    print("Starting as Test Bot")
     test_guild = [i for i in map(int, os.getenv("TEST_GUILD").split(","))]
     bot = voicemanager.VoiceManagedBot(debug_guilds=test_guild, intents=intents)
 else:
-    print("Public Bot")
+    print("Starting as Public Bot")
     bot = voicemanager.VoiceManagedBot(intents=intents)
 
 vm = bot.voice_manager
@@ -43,6 +43,7 @@ database.DictionaryLoader.set_db_path(os.path.join(os.path.dirname(os.path.abspa
 
 @bot.event
 async def on_ready():
+    """Event handler for bot ready."""
     print(f"logged in as {bot.user}")
     print(f"guilds: {[(g.name, g.id) for g in bot.guilds]}")
     database.SettingLoader.create_table()
@@ -56,6 +57,7 @@ async def on_ready():
 
 @bot.event
 async def on_message(message: discord.Message):
+    """Event handler for receiving message."""
     if vm.read_channel is None:
         return
 
@@ -69,11 +71,13 @@ async def on_message(message: discord.Message):
             return
         elif message.author.voice.channel != vm.voice_client.channel:
             return
+    print(message.clean_content)
     vm.speak_message_q.put(message)
 
 
 @bot.event
 async def on_guild_join(guild: discord.Guild):
+    """Event handler for guild join."""
     database.DictionaryLoader.create_table(guild.id)
     vm.set_replacer(guild.id)
     vm.guild_settings.auto_load(guild.id)
@@ -81,6 +85,13 @@ async def on_guild_join(guild: discord.Guild):
 
 @bot.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+    """Event handler for voice state update."""
+    if member.id == bot.user.id:
+        if after.channel is None:
+            if vm.voice_client:
+                await vm.disconnect()
+                print("Disconnected")
+                return
     if member.bot:
         return
     if vm.voice_client is None:
@@ -103,10 +114,10 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
             return
 
 
-@tasks.loop(seconds=0.5)
+@tasks.loop(seconds=0.1)
 async def say_clock():
     """Check if the bot is speaking and play the next source if it is not playing."""
-    if not vm.voice_client.is_connected() or not vm.voice_client:
+    if not vm.voice_client:
         await vm.stop()
         say_clock.stop()
         return
@@ -122,7 +133,8 @@ async def say_clock():
 
 @bot.slash_command(description="応答速度を確認する")
 async def ping(ctx: ApplicationContext):
-    await ctx.respond(f"{round(bot.latency * 1000, 2)}ms")
+    """Check the response time of the bot."""
+    await ctx.respond(f":ping_pong: {round(bot.latency * 1000, 2)}ms")
 
 
 @bot.slash_command(description="ボイスチャンネルに接続する")
@@ -131,6 +143,10 @@ async def join(
         vc: Option(GuildChannel, channel_types=[ChannelType.voice], required=False, description="接続するVC"),
         force: Option(bool, default=False, description="他で接続中でも強制的に接続させます")
 ):
+    """Connect to the voice channel."""
+    if ctx.voice_client != vm.voice_client:
+        vm.voice_client = ctx.voice_client
+        await ctx.respond("エラーが発生しました\n再度コマンドを実行してください")
     if vm.voice_client is not None and not force:
         await ctx.respond(f"既に{vm.voice_client.channel.name}に接続しています\n"
                           f"強制的に接続する場合は`force`オプションをTrueにしてください")
@@ -159,6 +175,10 @@ async def join(
 
 @bot.slash_command(description="VCを切断する")
 async def leave(ctx: ApplicationContext):
+    """Disconnect from the voice channel."""
+    if ctx.voice_client != vm.voice_client:
+        vm.voice_client = ctx.voice_client
+        await ctx.respond("エラーが発生しました\n再度コマンドを実行してください")
     if ctx.voice_client:
         await vm.disconnect()
         await ctx.respond(f"切断しました")

@@ -1,6 +1,7 @@
 import io
 import re
 from queue import Empty, Queue
+from subprocess import DEVNULL
 import threading
 import time
 import discord
@@ -8,12 +9,14 @@ from vv_wrapper import call, database
 
 
 class VoiceManagedBot(discord.Bot):
+    """A subclass of discord.Bot that has a VoiceManager instance."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.voice_manager: VoiceManager = VoiceManager(self)
 
 
 class VoiceManager:
+    """Manages voice connections and text-to-speech conversion."""
     def __init__(self, bot: discord.Bot):
         self.bot: discord.Bot = bot
         self.read_channel: discord.TextChannel | None = None
@@ -33,22 +36,47 @@ class VoiceManager:
 
     @property
     def speakers(self) -> call.SpeakersHolder:
+        """
+        Get the available speakers from VoiceVox.
+        :return: A SpeakersHolder object containing the available speakers.
+        """
         return call.VoiceVox.get_speakers()
 
 
     def get_user_setting(self, user_id: int) -> database.UserSetting:
+        """
+        Get the user setting for a user.
+        If the setting is not loaded, load it from the database.
+        :param user_id: discord user id
+        :return: UserSetting object
+        """
         if self.user_settings.get(user_id) is None:
-            self.user_settings[user_id] = database.SettingLoader.smart_fetch(user_id, "users", True)
+            self.user_settings[user_id] = database.SettingLoader.smart_fetch("users", user_id, True)
         return self.user_settings[user_id]
 
     def set_replacer(self, guild_id: int) -> None:
+        """
+        Set the replacers for a guild.
+        load the replacers from the database.
+        :param guild_id:
+        :return: None
+        """
         self.guild_replacers.auto_load(guild_id)
 
     def set_replacers(self, guild_ids: list[int]) -> None:
+        """
+        Set the replacers for multiple guilds.
+        :param guild_ids:
+        :return:
+        """
         for guild_id in guild_ids:
             self.set_replacer(guild_id)
 
     async def stop(self):
+        """
+        Stop the voice manager.
+        :return:
+        """
         await self.disconnect()
         self.qclear()
         self.voice_client = None
@@ -56,10 +84,19 @@ class VoiceManager:
         self.speak_channel = None
 
     def qclear(self):
+        """
+        Clear the speak_message_q and speak_source_q.
+        cleanup the queues.
+        :return:
+        """
         self.speak_message_q = Queue()
         self.speak_source_q = Queue()
 
     async def disconnect(self):
+        """
+        Disconnect the voice client.
+        :return:
+        """
         if self.voice_client is not None:
             self.stop_converter()
             await self.voice_client.disconnect()
@@ -67,6 +104,11 @@ class VoiceManager:
             self.start_converter()
 
     async def connect(self, channel: discord.VoiceChannel) -> discord.Client:
+        """
+        Connect to a voice channel.
+        :param channel:
+        :return:
+        """
         if self.voice_client is None:
             self.voice_client = await channel.connect()
         else:
@@ -75,7 +117,13 @@ class VoiceManager:
         return self.voice_client
 
     def _converter(self):
-        """Converts text to speech and puts it in the speak_source_q."""
+        """
+        The main loop of the converter thread.
+        get the text from the speak_message_q and convert it to audio.
+        put the audio in the speak_source_q.
+        apply the user and guild settings to the text.
+        :return:
+        """
         while self.converter_loop:
             user_settings: database.UserSetting | None = None
             server_settings: database.GuildSetting | None = None
@@ -118,6 +166,7 @@ class VoiceManager:
                         text = text[:server_settings.read_length] + "、以下省略"
 
             text = reply + text
+            print(text)
             text = re.split("[。、\n]", text)
 
             for t in text:
@@ -127,27 +176,37 @@ class VoiceManager:
                     wav = call.VoiceVox.synth_from_settings(t, server_settings)
                 else:
                     wav = call.VoiceVox.synthesize(t)
-                source = discord.FFmpegOpusAudio(io.BytesIO(wav), pipe=True)
+                source = discord.FFmpegOpusAudio(io.BytesIO(wav), pipe=True, stderr=DEVNULL)
                 self.speak_source_q.put(source)
 
             time.sleep(0.3)
 
     def start_converter(self):
+        """
+        Start the converter thread.
+        :return:
+        """
         self.converter_loop = True
         self.converter_thread = threading.Thread(target=self._converter)
         self.converter_thread.start()
 
     def stop_converter(self, join: bool = False) -> None:
+        """
+        Stop the converter thread.
+        :param join: whether to wait for the thread to finish
+        :return:
+        """
         self.converter_loop = False
         if join:
             self.converter_thread.join()
 
     def speak(self, text: str, guild: int = None, user: int = None):
+        """
+        Speak the text.
+        add the text to the speak_message_q.
+        :param text: content of the message
+        :param guild: discord guild id to apply the guild settings and replacers
+        :param user: discord user id to apply the user settings and replacers
+        :return:
+        """
         self.speak_message_q.put({"text": text, "guild": guild, "user": user})
-
-    def play(self, source: discord.AudioSource | None = None):
-        if self.voice_client is None:
-            raise discord.ClientException('voice client is not connected')
-        if source is None:
-            source = self.speak_source_q.get()
-        self.voice_client.play(source)

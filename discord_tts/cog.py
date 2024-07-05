@@ -20,6 +20,12 @@ def list_pagenation(regex: dict, simple: dict) -> Paginator:
         embed.add_field(name="変換後", value=v)
         embed.add_field(name="正規表現", value="使用する")
         pages.append(Page(embeds=[embed]))
+    for k, v in simple.items():
+        embed = Embed(title="辞書一覧")
+        embed.add_field(name="変換前", value=k)
+        embed.add_field(name="変換後", value=v)
+        embed.add_field(name="正規表現", value="使用しない")
+        pages.append(Page(embeds=[embed]))
     return Paginator(pages=pages)
 
 
@@ -133,10 +139,10 @@ class UserCommands(commands.Cog):
             after: Option(str, "変換後の文字列"),
             use_regex: Option(bool, "正規表現を使用するか", default=False)
     ):
-        if self.vm.user_replacers.get(ctx.author.id, before):
+        user_id = ctx.author.id
+        if before in self.vm.user_replacers.get(user_id).keys():
             await ctx.respond("辞書が既に存在します")
             return
-        user_id = ctx.author.id
         self.vm.user_replacers.add(user_id, before, after, use_regex)
         embed = Embed(
             title="ユーザー辞書追加",
@@ -167,7 +173,9 @@ class UserCommands(commands.Cog):
             ctx: ApplicationContext
     ):
         user_id = ctx.author.id
+        self.vm.user_replacers.auto_load(user_id)
         data = self.vm.user_replacers.get(user_id)
+        print(data)
         if not data:
             await ctx.respond("辞書が存在しません")
             return
@@ -337,7 +345,7 @@ class GuildCommands(commands.Cog):
             after: Option(str, "変換後の文字列"),
             use_regex: Option(bool, "正規表現を使用するか", default=False)
     ):
-        if self.vm.guild_replacers.get(ctx.guild.id, before):
+        if before in self.vm.guild_replacers.get(ctx.guild.id):
             await ctx.respond("辞書が既に存在します")
             return
         self.vm.guild_replacers.add(ctx.guild.id, before, after, use_regex)
