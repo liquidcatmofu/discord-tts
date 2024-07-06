@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from json import loads, dumps
 import os
 import re
 import sqlite3
@@ -131,6 +132,21 @@ class Replacer:
         code_blocks = re.findall(code_block_pattern, text, re.DOTALL)
         for code_block in code_blocks:
             text = text.replace(code_block, replacement)
+        return text
+
+    @staticmethod
+    def replace_custom_emoji(text: str, replacement: str) -> str:
+        """
+        Replace custom emojis in the text.
+        :param text: Text to be replaced
+        :param replacement: Replacement for custom emojis
+        :return: Replaced text
+        """
+        # カスタム絵文字の正規表現パターン
+        emoji_pattern = r'<a?:[a-zA-Z0-9]+:[0-9]+>'
+        emojis = re.findall(emoji_pattern, text)
+        for emoji in emojis:
+            text = text.replace(emoji, replacement)
         return text
 
     def __bool__(self):
@@ -413,8 +429,9 @@ class GuildSetting(BaseSetting):
     read_length: bool
     read_nonparticipation: bool
     read_replyuser: bool
-    ignore_users: list[str]
-    ignore_roles: list[str]
+    ignore_users: list[int]
+    ignore_roles: list[int]
+    read_nick: bool
 
 
 @dataclass
@@ -642,7 +659,7 @@ class SettingLoader:
                        f"(id INTEGER PRIMARY KEY , speaker INTEGER NOT NULL , speed REAL , pitch REAL, intonation REAL,"
                        f" volume REAL , force_setting INTEGER , force_speaker INTEGER , read_joinleave INTEGER ,"
                        f" read_length INTEGER , read_nonparticipation INTEGER , read_replyuser INTEGER ,"
-                       f"  ignore_users TEXT , ignore_roles TEXT)")
+                       f"  ignore_users TEXT , ignore_roles TEXT , read_nick INTEGER)")
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -667,7 +684,7 @@ class SettingLoader:
         elif table == "guilds":
             datas = {"speaker": 3, "speed": 1.1, "pitch": 0.0, "intonation": 1.0, "volume": 1.0, "force_setting": 0,
                      "force_speaker": 0, "read_joinleave": 1, "read_length": 100, "read_nonparticipation": 0,
-                     "read_replyuser": 0, "ignore_users": "", "ignore_roles": ""}
+                     "read_replyuser": 0, "ignore_users": "[]", "ignore_roles": "[]", "read_nick": 1}
         else:
             raise ValueError(f"table name {table} is invalid")
         datas.update(kwargs)
@@ -681,12 +698,13 @@ class SettingLoader:
             elif table == "guilds":
                 db.execute(
                     f"INSERT INTO {table} (id, speaker, speed, pitch, intonation, volume, force_setting, force_speaker,"
-                    f" read_joinleave, read_length, read_nonparticipation, read_replyuser, ignore_users, ignore_roles) "
-                    f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    f" read_joinleave, read_length, read_nonparticipation, read_replyuser, ignore_users, ignore_roles,"
+                    f" read_nick) "
+                    f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (id, datas["speaker"], datas["speed"], datas["pitch"], datas["intonation"], datas["volume"],
                      datas["force_setting"], datas["force_speaker"], datas["read_joinleave"], datas["read_length"],
                      datas["read_nonparticipation"], datas["read_replyuser"], datas["ignore_users"],
-                     datas["ignore_roles"]))
+                     datas["ignore_roles"], datas["read_nick"]))
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -766,7 +784,7 @@ class SettingLoader:
         """
         db = SQLiteWrapper(cls.file_path)
         create = False
-        data: list | None = None
+        data: list[tuple] | None = None
         try:
             data = db.execute(f"SELECT * FROM {table} WHERE id = ?",
                               (id,))
@@ -798,8 +816,12 @@ class SettingLoader:
         data = cls.fetch_settings(table, id, auto_create)
         if not data:
             return None
+        print("smart", data)
         if table == "guilds":
-            return GuildSetting(*data[0])
+            dat = list(data[0])
+            dat[12] = loads(dat[12]) if dat[12] else []
+            dat[13] = loads(dat[13]) if dat[13] else []
+            return GuildSetting(*dat)
         elif table == "users":
             return UserSetting(*data[0])
         else:

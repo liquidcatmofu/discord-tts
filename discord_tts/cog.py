@@ -1,3 +1,4 @@
+from json import dumps
 import discord
 from discord import ApplicationContext, Embed
 from discord.ext import commands
@@ -42,7 +43,7 @@ class UserCommands(commands.Cog):
     # async def style_choices(cls, ctx: discord.AutocompleteContext):
     #     return list(cls.speakers.styles())
 
-    @user_setting.command()
+    @user_setting.command(name="change-speaker", description="話者を変更")
     async def change_speaker(
             self,
             ctx: ApplicationContext,
@@ -57,7 +58,7 @@ class UserCommands(commands.Cog):
         self.vm.user_settings.update(user_id, "speaker", speaker_id)
         await ctx.respond(f"{ctx.user.display_name}の話者を{speaker}に変更しました")
 
-    @user_setting.command()
+    @user_setting.command(name="change-speed", description="再生速度を変更")
     async def change_speed(
             self,
             ctx: ApplicationContext,
@@ -70,7 +71,7 @@ class UserCommands(commands.Cog):
         self.vm.user_settings.update(user_id, "speed", speed)
         await ctx.respond(f"{ctx.user.display_name}の再生速度を{speed}に変更しました")
 
-    @user_setting.command()
+    @user_setting.command(name="change-pitch", description="音程を変更")
     async def change_pitch(
             self,
             ctx: ApplicationContext,
@@ -83,7 +84,7 @@ class UserCommands(commands.Cog):
         self.vm.user_settings.update(user_id, "pitch", pitch)
         await ctx.respond(f"{ctx.user.display_name}の音程を{pitch}に変更しました")
 
-    @user_setting.command()
+    @user_setting.command(name="change-intonation", description="抑揚を変更")
     async def change_intonation(
             self,
             ctx: ApplicationContext,
@@ -96,7 +97,7 @@ class UserCommands(commands.Cog):
         self.vm.user_settings.update(user_id, "intonation", intonation)
         await ctx.respond(f"{ctx.user.display_name}の抑揚を{intonation}に変更しました")
 
-    @user_setting.command()
+    @user_setting.command(name="change-volume", description="音量を変更")
     async def change_volume(
             self,
             ctx: ApplicationContext,
@@ -109,7 +110,7 @@ class UserCommands(commands.Cog):
         self.vm.user_settings.update(user_id, "volume", volume)
         await ctx.respond(f"{ctx.user.display_name}の音量を{volume}に変更しました")
 
-    @user_setting.command()
+    @user_setting.command(name="change-read-joinleave", description="参加/退出読み上げを変更")
     async def show_setting(
             self,
             ctx: ApplicationContext
@@ -131,7 +132,7 @@ class UserCommands(commands.Cog):
         )
         await ctx.respond(embed=embed)
 
-    @user_dictionary.command()
+    @user_dictionary.command(name="add", description="ユーザー辞書を追加する")
     async def add(
             self,
             ctx: ApplicationContext,
@@ -150,7 +151,7 @@ class UserCommands(commands.Cog):
         )
         await ctx.respond(embed=embed)
 
-    @user_dictionary.command()
+    @user_dictionary.command(name="delete", description="ユーザー辞書を削除する")
     async def delete(
             self,
             ctx: ApplicationContext,
@@ -167,7 +168,7 @@ class UserCommands(commands.Cog):
         )
         await ctx.respond(embed=embed)
 
-    @user_dictionary.command()
+    @user_dictionary.command(name="list", description="ユーザー辞書を表示する")
     async def list(
             self,
             ctx: ApplicationContext
@@ -183,7 +184,7 @@ class UserCommands(commands.Cog):
         pagenator = list_pagenation(data.regex_replacements_str, data.simple_replacements)
         await pagenator.respond(ctx.interaction)
 
-    @user_dictionary.command()
+    @user_dictionary.command(name="update", description="ユーザー辞書を更新する")
     async def update(
             self,
             ctx: ApplicationContext,
@@ -213,103 +214,206 @@ class GuildCommands(commands.Cog):
     guild_setting = SlashCommandGroup("server-setting", "サーバー設定コマンド")
     guild_dictionary = SlashCommandGroup("dictionary", "サーバー辞書操作コマンド")
 
-    @guild_setting.command()
+    @guild_setting.command(name="change-speaker", description="サーバー標準の話者を変更")
     async def change_speaker(
             self,
             ctx: ApplicationContext,
             speaker: Option(str, "サーバー標準話者を変更", autocomplete=style_choices)
     ):
-        guild_id = ctx.guild.id
         speaker_id = styles.get(speaker)
         if speaker_id is None:
             await ctx.respond("無効な値です")
             return
-        self.vm.guild_settings.update(guild_id, "speaker", speaker_id)
+        self.vm.guild_settings.update(ctx.guild.id, "speaker", speaker_id)
         await ctx.respond(f"サーバー標準の話者を{speaker}に変更しました")
 
-    @guild_setting.command()
+    @guild_setting.command(name="change-speed", description="サーバー標準再生速度を変更")
     async def change_speed(
             self,
             ctx: ApplicationContext,
             speed: Option(float, "サーバー標準再生速度を変更", min_value=0.5, max_value=2.0)
     ):
-        guild_id = ctx.guild.id
         if not (0.5 <= speed <= 2.0):
             await ctx.respond("再生速度は0.5から2.0の間で指定してください")
             return
-        self.vm.guild_settings.update(guild_id, "speed", speed)
+        self.vm.guild_settings.update(ctx.guild.id, "speed", speed)
         await ctx.respond(f"サーバー標準の再生速度を{speed}に変更しました")
 
-    @guild_setting.command()
+    @guild_setting.command(name="change-pitch", description="サーバー標準音程を変更")
     async def change_pitch(
             self,
             ctx: ApplicationContext,
             pitch: Option(float, "サーバー標準音程を変更", min_value=-0.15, max_value=0.15)
     ):
-        guild_id = ctx.guild.id
         if not (-0.15 <= pitch <= 0.15):
             await ctx.respond("音程は-0.15から0.15の間で指定してください")
             return
-        self.vm.guild_settings.update(guild_id, "pitch", pitch)
+        self.vm.guild_settings.update(ctx.guild.id, "pitch", pitch)
         await ctx.respond(f"サーバー標準の音程を{pitch}に変更しました")
 
-    @guild_setting.command()
+    @guild_setting.command(name="change-intonation", description="サーバー標準抑揚を変更")
     async def change_intonation(
             self,
             ctx: ApplicationContext,
             intonation: Option(float, "サーバー標準抑揚を変更", min_value=0.0, max_value=2.0)
     ):
-        guild_id = ctx.guild.id
         if not (0.0 <= intonation <= 2.0):
             await ctx.respond("抑揚は0.0から2.0の間で指定してください")
             return
-        self.vm.guild_settings.update(guild_id, "intonation", intonation)
+        self.vm.guild_settings.update(ctx.guild.id, "intonation", intonation)
         await ctx.respond(f"サーバー標準の抑揚を{intonation}に変更しました")
 
-    @guild_setting.command()
+    @guild_setting.command(name="change-volume", description="サーバー標準音量を変更")
     async def change_volume(
             self,
             ctx: ApplicationContext,
             volume: Option(float, "サーバー標準音量を変更", min_value=0.0, max_value=2.0)
     ):
-        guild_id = ctx.guild.id
         if not (0.0 <= volume <= 2.0):
             await ctx.respond("音量は0.0から2.0の間で指定してください")
             return
-        self.vm.guild_settings.update(guild_id, "volume", volume)
+        self.vm.guild_settings.update(ctx.guild.id, "volume", volume)
         await ctx.respond(f"サーバー標準の音量を{volume}に変更しました")
 
-    @guild_setting.command()
+    @guild_setting.command(name="change-read-joinleave", description="参加/退出読み上げを変更")
     async def change_read_joinleave(
             self,
             ctx: ApplicationContext,
             read_joinleave: Option(bool, "ユーザーの参加/退出を読み上げるか")
     ):
-        guild_id = ctx.guild.id
-        self.vm.guild_settings.update(guild_id, "read_joinleave", read_joinleave)
+        self.vm.guild_settings.update(ctx.guild.id, "read_joinleave", read_joinleave)
         await ctx.respond(f"ユーザーの参加/退出を読み上げる設定を{read_joinleave}に変更しました")
 
-    @guild_setting.command()
+    @guild_setting.command(name="change-read-nonpaticipant", description="VCに参加していないユーザーの読み上げを変更")
     async def change_read_nonpaticipant(
             self,
             ctx: ApplicationContext,
             read_nonparticipant: Option(bool, "VCに参加していないユーザーを読み上げるか")
     ):
-        guild_id = ctx.guild.id
-        self.vm.guild_settings.update(guild_id, "read_nonparticipant", read_nonparticipant)
+        self.vm.guild_settings.update(ctx.guild.id, "read_nonparticipation", read_nonparticipant)
         await ctx.respond(f"VCに参加していないユーザーを読み上げる設定を{read_nonparticipant}に変更しました")
 
-    @guild_setting.command()
+    @guild_setting.command(name="change-read-replyuser", description="リプライユーザー読み上げを変更")
     async def change_read_replyuser(
             self,
             ctx: ApplicationContext,
             read_replyuser: Option(bool, "リプライされたユーザーを読み上げるか")
     ):
-        guild_id = ctx.guild.id
-        self.vm.guild_settings.update(guild_id, "read_replyuser", read_replyuser)
+        self.vm.guild_settings.update(ctx.guild.id, "read_replyuser", read_replyuser)
         await ctx.respond(f"リプライされたユーザーを読み上げる設定を{read_replyuser}に変更しました")
 
-    @guild_setting.command()
+    @guild_setting.command(name="change-read-nickname", description="ニックネーム読み上げを変更")
+    async def read_nickname(
+            self,
+            ctx: ApplicationContext,
+            read_nick: Option(bool, "ニックネームを読み上げるか")
+    ):
+        self.vm.guild_settings.update(ctx.guild.id, "read_nick", read_nick)
+        await ctx.respond(f"ニックネームを読み上げる設定を{read_nick}に変更しました")
+
+    @guild_setting.command(name="add-ignore-user", description="読み上げを無視するユーザーを追加")
+    async def add_ignore_user(
+            self,
+            ctx: ApplicationContext,
+            user: Option(discord.Member, "読み上げを無視するユーザー")
+    ):
+        ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_users
+        if user.id in ignores:
+            await ctx.respond("既に追加されています")
+            return
+        ignores.append(user.id)
+        self.vm.guild_settings.update(ctx.guild.id, "ignore_users", dumps(ignores))
+        await ctx.respond(f"読み上げを無視するユーザーに`{user.name}`さんを追加しました\n現在{len(ignores)}人が登録されています")
+
+    @guild_setting.command(name="remove-ignore-user", description="読み上げを無視するユーザーを削除")
+    async def remove_ignore_user(
+            self,
+            ctx: ApplicationContext,
+            user: Option(discord.Member, "読み上げの無視を解除するユーザー")
+    ):
+        ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_users
+        if user.id not in ignores:
+            await ctx.respond("登録されていません")
+            return
+        ignores.remove(user.id)
+        self.vm.guild_settings.update(ctx.guild.id, "ignore_users", dumps(ignores))
+        await ctx.respond(f"読み上げを無視するユーザーから`{user.name}`さんを削除しました\n現在{len(ignores)}人が登録されています")
+
+    @guild_setting.command(name="ignore-user-list", description="読み上げを無視するユーザーを表示")
+    async def ignore_user_list(
+            self,
+            ctx: ApplicationContext,
+            remove_notfound: Option(bool, "存在しないユーザーを削除するか", default=False)
+    ):
+        ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_users
+        if not ignores:
+            await ctx.respond("登録されているユーザーはいません")
+            return
+        users = []
+        notfound = []
+        for i in ignores:
+            user = ctx.guild.get_member(i)
+            if user:
+                users.append(user)
+            elif remove_notfound:
+                ignores.remove(i)
+                notfound.append(i)
+            else:
+                users.append("不明なユーザー")
+        await ctx.respond("\n".join([f"{i}. {user.name}" for i, user in enumerate(users, 1)]))
+        if notfound:
+            self.vm.guild_settings.update(ctx.guild.id, "ignore_users", dumps(ignores))
+            await ctx.send(f"存在しないユーザーを削除しました\n{', '.join(notfound)}")
+
+    @guild_setting.command(name="add-ignore-role", description="読み上げを無視するロールを追加")
+    async def add_ignore_role(
+            self,
+            ctx: ApplicationContext,
+            role: Option(discord.Role, "読み上げを無視するロール")
+    ):
+        ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_roles
+        if role.id in ignores:
+            await ctx.respond("既に追加されています")
+            return
+        ignores.append(role.id)
+        self.vm.guild_settings.update(ctx.guild.id, "ignore_roles", dumps(ignores))
+        await ctx.respond(f"読み上げを無視するロールに`{role.name}`を追加しました\n現在{len(ignores)}個が登録されています")
+
+    @guild_setting.command(name="remove-ignore-role", description="読み上げを無視するロールを削除")
+    async def remove_ignore_role(
+            self,
+            ctx: ApplicationContext,
+            role: Option(discord.Role, "読み上げの無視を解除するロール")
+    ):
+        ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_roles
+        if role.id not in ignores:
+            await ctx.respond("登録されていません")
+            return
+        ignores.remove(role.id)
+        self.vm.guild_settings.update(ctx.guild.id, "ignore_roles", dumps(ignores))
+        await ctx.respond(f"読み上げを無視するロールから`{role.name}`を削除しました\n現在{len(ignores)}個が登録されています")
+
+    @guild_setting.command(name="ignore-role-list", description="読み上げを無視するロールを表示")
+    async def ignore_role_list(self, ctx: ApplicationContext):
+        ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_roles
+        if not ignores:
+            await ctx.respond("登録されているロールはありません")
+            return
+        roles = []
+        for i in ignores:
+            role = ctx.guild.get_role(i)
+            if role:
+                roles.append(role)
+            else:
+                roles.append("不明なロール")
+                ignores.remove(i)
+        await ctx.respond("\n".join([f"{i}. {role.name}" for i, role in enumerate(roles, 1)]))
+        if len(ignores) != len(roles):
+            self.vm.guild_settings.update(ctx.guild.id, "ignore_roles", dumps(ignores))
+            await ctx.send("存在しないロールを削除しました")
+
+
+    @guild_setting.command(name="show-setting", description="サーバー設定を表示")
     async def show_setting(
             self,
             ctx: ApplicationContext

@@ -1,4 +1,5 @@
 import io
+from json import loads, dumps
 import re
 from queue import Empty, Queue
 from subprocess import DEVNULL
@@ -128,18 +129,20 @@ class VoiceManager:
             user_settings: database.UserSetting | None = None
             server_settings: database.GuildSetting | None = None
             message_type: discord.MessageType | None = None
+            ignore_users: list[int] = []
+            ignore_roles: list[int] = []
             reply: str = ""
             try:
                 message = self.speak_message_q.get()
                 if isinstance(message, discord.Message):
-                    text = message.clean_content
-                    guild = message.guild.id
-                    user = message.author.id
-                    message_type = message.type
+                    text: str = message.clean_content
+                    guild: int = message.guild.id
+                    user: discord.user = message.author
+                    message_type: discord.MessageType = message.type
                 elif isinstance(message, dict):
-                    text = message.get("text")
-                    guild = message.get("guild")
-                    user = message.get("user")
+                    text: str = message.get("text")
+                    guild: int = message.get("guild")
+                    user: discord.user = message.get("user")
                 else:
                     raise TypeError(f"message is not discord.Message or dict, but {type(message).__name__}")
             except Empty:
@@ -147,15 +150,21 @@ class VoiceManager:
 
             if guild is not None:
                 server_settings = self.guild_settings.get(guild)
+                ignore_users = server_settings.ignore_users
+                ignore_roles = server_settings.ignore_roles
 
             if user is not None:
-                userdict = self.user_replacers.get(user)
+                if user.id in ignore_users:
+                    continue
+                if any(role.id in ignore_roles for role in user.roles):
+                    continue
+                userdict = self.user_replacers.get(user.id)
                 if message_type == discord.MessageType.reply:
                     if server_settings.read_replyuser:
                         reply += f"{self.bot.get_message(message.reference.message_id).author.display_name}へ"
                     reply += f"リプライ、"
 
-                user_settings = self.user_settings.get(user)
+                user_settings = self.user_settings.get(user.id)
                 reply = userdict.replace(reply)
                 text = userdict.replace(text)
 
@@ -194,19 +203,19 @@ class VoiceManager:
         """
         Stop the converter thread.
         :param join: whether to wait for the thread to finish
-        :return:
+        :return: None
         """
         self.converter_loop = False
         if join:
             self.converter_thread.join()
 
-    def speak(self, text: str, guild: int = None, user: int = None):
+    def speak(self, text: str, guild: int = None, user: discord.user = None):
         """
         Speak the text.
         add the text to the speak_message_q.
         :param text: content of the message
         :param guild: discord guild id to apply the guild settings and replacers
         :param user: discord user id to apply the user settings and replacers
-        :return:
+        :return: None
         """
         self.speak_message_q.put({"text": text, "guild": guild, "user": user})

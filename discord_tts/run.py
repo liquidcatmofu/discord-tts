@@ -96,21 +96,23 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
         return
     if vm.voice_client is None:
         return
-    if not vm.guild_settings.get(vm.voice_client.guild.id).read_joinleave:
+    guild_settings = vm.guild_settings.get(member.guild.id)
+    if not guild_settings.read_joinleave:
         return
     replacer = vm.user_replacers.get(member.id)
+    name = member.display_name if guild_settings.read_nick else member.name
 
     if after.channel is not None:
         if after.channel.id == vm.voice_client.channel.id:
             if before.channel == after.channel:
                 return
-            vm.speak(f"{replacer.replace(member.display_name)}さんが参加しました", guild=member.guild.id)
+            vm.speak(f"{replacer.replace(name)}さんが参加しました", guild=member.guild.id)
             return
     elif before.channel is not None:
         if before.channel.id == vm.voice_client.channel.id:
             if after.channel == before.channel:
                 return
-            vm.speak(f"{replacer.replace(member.display_name)}さんが退出しました", guild=member.guild.id)
+            vm.speak(f"{replacer.replace(name)}さんが退出しました", guild=member.guild.id)
             return
 
 
@@ -147,8 +149,8 @@ async def join(
     if ctx.voice_client != vm.voice_client:
         vm.voice_client = ctx.voice_client
         await ctx.respond("エラーが発生しました\n再度コマンドを実行してください")
-    if vm.voice_client is not None and not force:
-        await ctx.respond(f"既に{vm.voice_client.channel.name}に接続しています\n"
+    if vm.voice_client and not force:
+        await ctx.respond(f"既に<#{vm.voice_client.channel.id}>に接続しています\n"
                           f"強制的に接続する場合は`force`オプションをTrueにしてください")
         return
 
@@ -161,7 +163,7 @@ async def join(
     else:
         channel = vc
     if len(channel.members):
-        await ctx.respond(f"{channel.name}に接続しました")
+        await ctx.respond(f"<#{channel.id}>に接続しました")
         await vm.connect(channel)
         vm.read_channel = ctx.channel
         vm.qclear()
