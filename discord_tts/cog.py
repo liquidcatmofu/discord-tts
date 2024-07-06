@@ -354,16 +354,16 @@ class GuildCommands(commands.Cog):
         for i in ignores:
             user = ctx.guild.get_member(i)
             if user:
-                users.append(user)
+                users.append(user.name)
             elif remove_notfound:
                 ignores.remove(i)
                 notfound.append(i)
             else:
                 users.append("不明なユーザー")
-        await ctx.respond("\n".join([f"{i}. {user.name}" for i, user in enumerate(users, 1)]))
+        await ctx.respond("### 除外されたユーザー\n" + "\n".join([f"{i}. {user}" for i, user in enumerate(users, 1)]))
         if notfound:
             self.vm.guild_settings.update(ctx.guild.id, "ignore_users", dumps(ignores))
-            await ctx.send(f"存在しないユーザーを削除しました\n{', '.join(notfound)}")
+            await ctx.channel.send(f"存在しないユーザーを削除しました")
 
     @guild_setting.command(name="add-ignore-role", description="読み上げを無視するロールを追加")
     async def add_ignore_role(
@@ -403,15 +403,14 @@ class GuildCommands(commands.Cog):
         for i in ignores:
             role = ctx.guild.get_role(i)
             if role:
-                roles.append(role)
+                roles.append(role.name)
             else:
                 roles.append("不明なロール")
                 ignores.remove(i)
-        await ctx.respond("\n".join([f"{i}. {role.name}" for i, role in enumerate(roles, 1)]))
+        await ctx.respond("### 除外されたロール\n" + "\n".join([f"{i}. {role}" for i, role in enumerate(roles, 1)]))
         if len(ignores) != len(roles):
             self.vm.guild_settings.update(ctx.guild.id, "ignore_roles", dumps(ignores))
-            await ctx.send("存在しないロールを削除しました")
-
+            await ctx.channel.send("存在しないロールを削除しました")
 
     @guild_setting.command(name="show-setting", description="サーバー設定を表示")
     async def show_setting(
@@ -427,14 +426,17 @@ class GuildCommands(commands.Cog):
                 break
         embed = Embed(
             title=f"{ctx.guild.name}の設定",
-            description=f"話者: {speaker}\n"
-                        f"再生速度: {setting.speed}\n"
-                        f"音程: {setting.pitch}\n"
-                        f"抑揚: {setting.intonation}\n"
-                        f"音量: {setting.volume}\n"
-                        f"参加/退出読み上げ: {bool(setting.read_joinleave)}\n"
-                        f"VC未参加ユーザー読み上げ: {bool(setting.read_nonparticipation)}\n"
-                        f"リプライユーザー読み上げ: {bool(setting.read_replyuser)}"
+            description=f"話者: `{speaker}`\n"
+                        f"再生速度: `{setting.speed}`\n"
+                        f"音程: `{setting.pitch}`\n"
+                        f"抑揚: `{setting.intonation}`\n"
+                        f"音量: `{setting.volume}`\n"
+                        f"参加/退出読み上げ: `{bool(setting.read_joinleave)}`\n"
+                        f"VC未参加ユーザー読み上げ: `{bool(setting.read_nonparticipation)}`\n"
+                        f"リプライユーザー読み上げ: `{bool(setting.read_replyuser)}`\n"
+                        f"ニックネーム使用: `{bool(setting.read_nick)}`\n"
+                        f"除外ユーザー: `{len(setting.ignore_users)}`人\n"
+                        f"除外ロール: `{len(setting.ignore_roles)}`個"
         )
         await ctx.respond(embed=embed)
 
