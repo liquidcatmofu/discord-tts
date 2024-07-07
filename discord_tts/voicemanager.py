@@ -6,10 +6,11 @@ from subprocess import DEVNULL
 import threading
 import time
 import discord
+from discord.ext import bridge
 from vv_wrapper import call, database
 
 
-class VoiceManagedBot(discord.Bot):
+class VoiceManagedBot(bridge.Bot):
     """A subclass of discord.Bot that has a VoiceManager instance."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -42,7 +43,6 @@ class VoiceManager:
         :return: A SpeakersHolder object containing the available speakers.
         """
         return call.VoiceVox.get_speakers()
-
 
     def get_user_setting(self, user_id: int) -> database.UserSetting:
         """

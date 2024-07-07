@@ -43,7 +43,7 @@ class Speaker:
         speaker_name (style_name): style_id
         :return: SpeakerStyle dict
         """
-        return {f"{self.name} ({style.name})": style.id for style in self.styles}
+        return {f"{self.name}({style.name})": style.id for style in self.styles}
 
 
 @dataclass

@@ -816,7 +816,7 @@ class SettingLoader:
         data = cls.fetch_settings(table, id, auto_create)
         if not data:
             return None
-        print("smart", data)
+        print("smart", table, data)
         if table == "guilds":
             dat = list(data[0])
             dat[12] = loads(dat[12]) if dat[12] else []

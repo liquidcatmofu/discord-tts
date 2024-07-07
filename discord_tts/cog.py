@@ -1,9 +1,10 @@
 from json import dumps
 import discord
-from discord import ApplicationContext, Embed
-from discord.ext import commands
+from discord import Embed
+from discord.ext import commands, bridge
+from discord.ext.bridge import BridgeContext, BridgeApplicationContext, BridgeExtContext, BridgeOption
 from discord.ext.pages import Paginator, Page
-from discord.commands import slash_command, SlashCommandGroup, Option
+# from discord.commands import slash_command, SlashCommandGroup, Option
 import voicemanager
 
 styles: dict[str, str] = {}
@@ -30,14 +31,30 @@ def list_pagenation(regex: dict, simple: dict) -> Paginator:
     return Paginator(pages=pages)
 
 
+class BridgeCtx(BridgeApplicationContext, BridgeExtContext):
+    """
+    Used instead of BridgeContext
+    because BridgeContext causes annotation errors
+    """
+    pass
+
+
 class UserCommands(commands.Cog):
 
     def __init__(self, bot: discord.Bot, vm: voicemanager.VoiceManager):
         self.bot = bot
         self.vm: voicemanager.VoiceManager = vm
 
-    user_setting = SlashCommandGroup("user-setting", "ユーザー設定コマンド")
-    user_dictionary = SlashCommandGroup("user-dictionary", "ユーザー辞書操作コマンド")
+    @bridge.bridge_group(name="user-setting", description="ユーザー設定コマンド")
+    async def user_setting(self, ctx: BridgeContext):
+        pass
+
+    @bridge.bridge_group(name="user-dictionary", description="ユーザー辞書操作コマンド")
+    async def user_dictionary(self, ctx: BridgeContext):
+        pass
+
+    # user_setting = bridge.BridgeCommandGroup(bridge_command, name="user-setting", descriprion="ユーザー設定コマンド")
+    # user_dictionary = bridge.BridgeCommandGroup(bridge_command, name="user-dictionary", description="ユーザー辞書操作コマンド")
 
     # @classmethod
     # async def style_choices(cls, ctx: discord.AutocompleteContext):
@@ -46,74 +63,73 @@ class UserCommands(commands.Cog):
     @user_setting.command(name="change-speaker", description="話者を変更")
     async def change_speaker(
             self,
-            ctx: ApplicationContext,
-            speaker: Option(str, "話者を変更", autocomplete=style_choices)
+            ctx: BridgeCtx,
+            speaker: BridgeOption(str, "話者を変更", autocomplete=style_choices)
     ):
         user_id = ctx.author.id
-        print(user_id, ctx.author.display_name)
         speaker_id = self.vm.speakers.styles().get(speaker)
         if speaker_id is None:
             await ctx.respond("無効な値です")
             return
         self.vm.user_settings.update(user_id, "speaker", speaker_id)
-        await ctx.respond(f"{ctx.user.display_name}の話者を{speaker}に変更しました")
+        await ctx.respond(f"{ctx.author.display_name}さんの話者を{speaker}に変更しました")
 
     @user_setting.command(name="change-speed", description="再生速度を変更")
     async def change_speed(
             self,
-            ctx: ApplicationContext,
-            speed: Option(float, "再生速度を変更", min_value=0.5, max_value=2.0)
+            ctx: BridgeCtx,
+            speed: BridgeOption(float, "再生速度を変更", min_value=0.5, max_value=2.0)
     ):
         user_id = ctx.author.id
         if not (0.5 <= speed <= 2.0):
             await ctx.respond("再生速度は0.5から2.0の間で指定してください")
             return
         self.vm.user_settings.update(user_id, "speed", speed)
-        await ctx.respond(f"{ctx.user.display_name}の再生速度を{speed}に変更しました")
+        await ctx.respond(f"{ctx.author.display_name}の再生速度を{speed}に変更しました")
 
     @user_setting.command(name="change-pitch", description="音程を変更")
     async def change_pitch(
             self,
-            ctx: ApplicationContext,
-            pitch: Option(float, "音程を変更", min_value=-0.15, max_value=0.15)
+            ctx: BridgeCtx,
+            pitch: BridgeOption(float, "音程を変更", min_value=-0.15, max_value=0.15)
     ):
         user_id = ctx.author.id
         if not (-0.15 <= pitch <= 0.15):
             await ctx.respond("音程は-0.15から0.15の間で指定してください")
             return
         self.vm.user_settings.update(user_id, "pitch", pitch)
-        await ctx.respond(f"{ctx.user.display_name}の音程を{pitch}に変更しました")
+        await ctx.respond(f"{ctx.author.display_name}の音程を{pitch}に変更しました")
 
     @user_setting.command(name="change-intonation", description="抑揚を変更")
     async def change_intonation(
             self,
-            ctx: ApplicationContext,
-            intonation: Option(float, "抑揚を変更", min_value=0.0, max_value=2.0)
+            ctx: BridgeCtx,
+            intonation: BridgeOption(float, "抑揚を変更", min_value=0.0, max_value=2.0)
     ):
         user_id = ctx.author.id
         if not (0.0 <= intonation <= 2.0):
             await ctx.respond("抑揚は0.0から2.0の間で指定してください")
             return
         self.vm.user_settings.update(user_id, "intonation", intonation)
-        await ctx.respond(f"{ctx.user.display_name}の抑揚を{intonation}に変更しました")
+        await ctx.respond(f"{ctx.author.display_name}の抑揚を{intonation}に変更しました")
 
     @user_setting.command(name="change-volume", description="音量を変更")
     async def change_volume(
             self,
-            ctx: ApplicationContext,
-            volume: Option(float, "音量を変更", min_value=0.0, max_value=2.0)
+            ctx: BridgeCtx,
+            volume: BridgeOption(float, "音量を変更", min_value=0.0, max_value=2.0)
     ):
         user_id = ctx.author.id
         if not (0.0 <= volume <= 2.0):
             await ctx.respond("音量は0.0から2.0の間で指定してください")
             return
         self.vm.user_settings.update(user_id, "volume", volume)
-        await ctx.respond(f"{ctx.user.display_name}の音量を{volume}に変更しました")
+        await ctx.respond(f"{ctx.author.display_name}の音量を{volume}に変更しました")
 
-    @user_setting.command(name="change-read-joinleave", description="参加/退出読み上げを変更")
+    @user_setting.command(name="show-setting", description="参加/退出読み上げを変更")
     async def show_setting(
             self,
-            ctx: ApplicationContext
+            ctx: BridgeCtx
     ):
         user_id = ctx.author.id
         setting = self.vm.get_user_setting(user_id)
@@ -123,7 +139,7 @@ class UserCommands(commands.Cog):
                 speaker = k
                 break
         embed = Embed(
-            title=f"{ctx.user.display_name}の設定",
+            title=f"{ctx.author.display_name}の設定",
             description=f"話者: {speaker}\n"
                         f"再生速度: {setting.speed}\n"
                         f"音程: {setting.pitch}\n"
@@ -135,10 +151,10 @@ class UserCommands(commands.Cog):
     @user_dictionary.command(name="add", description="ユーザー辞書を追加する")
     async def add(
             self,
-            ctx: ApplicationContext,
-            before: Option(str, "変換前の文字列"),
-            after: Option(str, "変換後の文字列"),
-            use_regex: Option(bool, "正規表現を使用するか", default=False)
+            ctx: BridgeCtx,
+            before: BridgeOption(str, "変換前の文字列"),
+            after: BridgeOption(str, "変換後の文字列"),
+            use_regex: BridgeOption(bool, "正規表現を使用するか", default=False)
     ):
         user_id = ctx.author.id
         if before in self.vm.user_replacers.get(user_id).keys():
@@ -154,8 +170,8 @@ class UserCommands(commands.Cog):
     @user_dictionary.command(name="delete", description="ユーザー辞書を削除する")
     async def delete(
             self,
-            ctx: ApplicationContext,
-            before: Option(str, "変換前の文字列")
+            ctx: BridgeCtx,
+            before: BridgeOption(str, "変換前の文字列")
     ):
         user_id = ctx.author.id
         if not self.vm.user_replacers.get(user_id, before):
@@ -171,27 +187,26 @@ class UserCommands(commands.Cog):
     @user_dictionary.command(name="list", description="ユーザー辞書を表示する")
     async def list(
             self,
-            ctx: ApplicationContext
+            ctx: BridgeCtx
     ):
         user_id = ctx.author.id
         self.vm.user_replacers.auto_load(user_id)
         data = self.vm.user_replacers.get(user_id)
-        print(data)
         if not data:
             await ctx.respond("辞書が存在しません")
             return
         await ctx.respond(f"{len(data)}件の辞書が登録されています")
         pagenator = list_pagenation(data.regex_replacements_str, data.simple_replacements)
-        await pagenator.respond(ctx.interaction)
+        await pagenator.respond(ctx)
 
     @user_dictionary.command(name="update", description="ユーザー辞書を更新する")
     async def update(
             self,
-            ctx: ApplicationContext,
-            old_before: Option(str, "変換前の文字列"),
-            new_before: Option(str, "変換前の文字列"),
-            after: Option(str, "変換後の文字列"),
-            use_regex: Option(bool, "正規表現を使用するか")
+            ctx: BridgeCtx,
+            old_before: BridgeOption(str, "変換前の文字列"),
+            new_before: BridgeOption(str, "変換前の文字列"),
+            after: BridgeOption(str, "変換後の文字列"),
+            use_regex: BridgeOption(bool, "正規表現を使用するか")
     ):
         user_id = ctx.author.id
         if not self.vm.user_replacers.get(user_id, old_before):
@@ -211,14 +226,19 @@ class GuildCommands(commands.Cog):
         self.bot = bot
         self.vm: voicemanager.VoiceManager = vm
 
-    guild_setting = SlashCommandGroup("server-setting", "サーバー設定コマンド")
-    guild_dictionary = SlashCommandGroup("dictionary", "サーバー辞書操作コマンド")
+    @bridge.bridge_group(name="server-setting", description="サーバー設定コマンド")
+    async def guild_setting(self, ctx: bridge.BridgeContext):
+        pass
+
+    @bridge.bridge_group(name="dictionary", description="サーバー辞書操作コマンド")
+    async def guild_dictionary(self, ctx: bridge.BridgeContext):
+        pass
 
     @guild_setting.command(name="change-speaker", description="サーバー標準の話者を変更")
     async def change_speaker(
             self,
-            ctx: ApplicationContext,
-            speaker: Option(str, "サーバー標準話者を変更", autocomplete=style_choices)
+            ctx: BridgeCtx,
+            speaker: BridgeOption(str, "サーバー標準話者を変更", autocomplete=style_choices)
     ):
         speaker_id = styles.get(speaker)
         if speaker_id is None:
@@ -230,8 +250,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="change-speed", description="サーバー標準再生速度を変更")
     async def change_speed(
             self,
-            ctx: ApplicationContext,
-            speed: Option(float, "サーバー標準再生速度を変更", min_value=0.5, max_value=2.0)
+            ctx: BridgeCtx,
+            speed: BridgeOption(float, "サーバー標準再生速度を変更", min_value=0.5, max_value=2.0)
     ):
         if not (0.5 <= speed <= 2.0):
             await ctx.respond("再生速度は0.5から2.0の間で指定してください")
@@ -242,8 +262,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="change-pitch", description="サーバー標準音程を変更")
     async def change_pitch(
             self,
-            ctx: ApplicationContext,
-            pitch: Option(float, "サーバー標準音程を変更", min_value=-0.15, max_value=0.15)
+            ctx: BridgeCtx,
+            pitch: BridgeOption(float, "サーバー標準音程を変更", min_value=-0.15, max_value=0.15)
     ):
         if not (-0.15 <= pitch <= 0.15):
             await ctx.respond("音程は-0.15から0.15の間で指定してください")
@@ -254,8 +274,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="change-intonation", description="サーバー標準抑揚を変更")
     async def change_intonation(
             self,
-            ctx: ApplicationContext,
-            intonation: Option(float, "サーバー標準抑揚を変更", min_value=0.0, max_value=2.0)
+            ctx: BridgeCtx,
+            intonation: BridgeOption(float, "サーバー標準抑揚を変更", min_value=0.0, max_value=2.0)
     ):
         if not (0.0 <= intonation <= 2.0):
             await ctx.respond("抑揚は0.0から2.0の間で指定してください")
@@ -266,8 +286,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="change-volume", description="サーバー標準音量を変更")
     async def change_volume(
             self,
-            ctx: ApplicationContext,
-            volume: Option(float, "サーバー標準音量を変更", min_value=0.0, max_value=2.0)
+            ctx: BridgeCtx,
+            volume: BridgeOption(float, "サーバー標準音量を変更", min_value=0.0, max_value=2.0)
     ):
         if not (0.0 <= volume <= 2.0):
             await ctx.respond("音量は0.0から2.0の間で指定してください")
@@ -278,8 +298,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="change-read-joinleave", description="参加/退出読み上げを変更")
     async def change_read_joinleave(
             self,
-            ctx: ApplicationContext,
-            read_joinleave: Option(bool, "ユーザーの参加/退出を読み上げるか")
+            ctx: BridgeCtx,
+            read_joinleave: BridgeOption(bool, "ユーザーの参加/退出を読み上げるか")
     ):
         self.vm.guild_settings.update(ctx.guild.id, "read_joinleave", read_joinleave)
         await ctx.respond(f"ユーザーの参加/退出を読み上げる設定を{read_joinleave}に変更しました")
@@ -287,8 +307,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="change-read-nonpaticipant", description="VCに参加していないユーザーの読み上げを変更")
     async def change_read_nonpaticipant(
             self,
-            ctx: ApplicationContext,
-            read_nonparticipant: Option(bool, "VCに参加していないユーザーを読み上げるか")
+            ctx: BridgeCtx,
+            read_nonparticipant: BridgeOption(bool, "VCに参加していないユーザーを読み上げるか")
     ):
         self.vm.guild_settings.update(ctx.guild.id, "read_nonparticipation", read_nonparticipant)
         await ctx.respond(f"VCに参加していないユーザーを読み上げる設定を{read_nonparticipant}に変更しました")
@@ -296,8 +316,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="change-read-replyuser", description="リプライユーザー読み上げを変更")
     async def change_read_replyuser(
             self,
-            ctx: ApplicationContext,
-            read_replyuser: Option(bool, "リプライされたユーザーを読み上げるか")
+            ctx: BridgeCtx,
+            read_replyuser: BridgeOption(bool, "リプライされたユーザーを読み上げるか")
     ):
         self.vm.guild_settings.update(ctx.guild.id, "read_replyuser", read_replyuser)
         await ctx.respond(f"リプライされたユーザーを読み上げる設定を{read_replyuser}に変更しました")
@@ -305,8 +325,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="change-read-nickname", description="ニックネーム読み上げを変更")
     async def read_nickname(
             self,
-            ctx: ApplicationContext,
-            read_nick: Option(bool, "ニックネームを読み上げるか")
+            ctx: BridgeCtx,
+            read_nick: BridgeOption(bool, "ニックネームを読み上げるか")
     ):
         self.vm.guild_settings.update(ctx.guild.id, "read_nick", read_nick)
         await ctx.respond(f"ニックネームを読み上げる設定を{read_nick}に変更しました")
@@ -314,8 +334,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="add-ignore-user", description="読み上げを無視するユーザーを追加")
     async def add_ignore_user(
             self,
-            ctx: ApplicationContext,
-            user: Option(discord.Member, "読み上げを無視するユーザー")
+            ctx: BridgeCtx,
+            user: BridgeOption(discord.Member, "読み上げを無視するユーザー")
     ):
         ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_users
         if user.id in ignores:
@@ -328,8 +348,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="remove-ignore-user", description="読み上げを無視するユーザーを削除")
     async def remove_ignore_user(
             self,
-            ctx: ApplicationContext,
-            user: Option(discord.Member, "読み上げの無視を解除するユーザー")
+            ctx: BridgeCtx,
+            user: BridgeOption(discord.Member, "読み上げの無視を解除するユーザー")
     ):
         ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_users
         if user.id not in ignores:
@@ -342,8 +362,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="ignore-user-list", description="読み上げを無視するユーザーを表示")
     async def ignore_user_list(
             self,
-            ctx: ApplicationContext,
-            remove_notfound: Option(bool, "存在しないユーザーを削除するか", default=False)
+            ctx: BridgeCtx,
+            remove_notfound: BridgeOption(bool, "存在しないユーザーを削除するか", default=False)
     ):
         ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_users
         if not ignores:
@@ -368,8 +388,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="add-ignore-role", description="読み上げを無視するロールを追加")
     async def add_ignore_role(
             self,
-            ctx: ApplicationContext,
-            role: Option(discord.Role, "読み上げを無視するロール")
+            ctx: BridgeCtx,
+            role: BridgeOption(discord.Role, "読み上げを無視するロール")
     ):
         ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_roles
         if role.id in ignores:
@@ -382,8 +402,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="remove-ignore-role", description="読み上げを無視するロールを削除")
     async def remove_ignore_role(
             self,
-            ctx: ApplicationContext,
-            role: Option(discord.Role, "読み上げの無視を解除するロール")
+            ctx: BridgeCtx,
+            role: BridgeOption(discord.Role, "読み上げの無視を解除するロール")
     ):
         ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_roles
         if role.id not in ignores:
@@ -394,7 +414,7 @@ class GuildCommands(commands.Cog):
         await ctx.respond(f"読み上げを無視するロールから`{role.name}`を削除しました\n現在{len(ignores)}個が登録されています")
 
     @guild_setting.command(name="ignore-role-list", description="読み上げを無視するロールを表示")
-    async def ignore_role_list(self, ctx: ApplicationContext):
+    async def ignore_role_list(self, ctx: BridgeCtx):
         ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_roles
         if not ignores:
             await ctx.respond("登録されているロールはありません")
@@ -415,7 +435,7 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="show-setting", description="サーバー設定を表示")
     async def show_setting(
             self,
-            ctx: ApplicationContext
+            ctx: BridgeCtx
     ):
         guild_id = ctx.guild.id
         setting = self.vm.guild_settings.get(guild_id)
@@ -446,24 +466,25 @@ class GuildCommands(commands.Cog):
     @guild_dictionary.command(name="add", description="辞書を追加する")
     async def add(
             self,
-            ctx: ApplicationContext,
-            before: Option(str, "変換前の文字列"),
-            after: Option(str, "変換後の文字列"),
-            use_regex: Option(bool, "正規表現を使用するか", default=False)
+            ctx: BridgeCtx,
+            before: BridgeOption(str, "変換前の文字列"),
+            after: BridgeOption(str, "変換後の文字列"),
+            use_regex: BridgeOption(bool, "正規表現を使用するか", default=False)
     ):
         if before in self.vm.guild_replacers.get(ctx.guild.id):
             await ctx.respond("辞書が既に存在します")
             return
         self.vm.guild_replacers.add(ctx.guild.id, before, after, use_regex)
-        embed = Embed(title="辞書追加",
-                      description=f"### 単語\n# ```{before}```\n### 読み\n# ```{after}```\n### 正規表現: {'使用する' if use_regex else '使用しない'}")
+        description = (f"### 単語\n```{before}```\n### 読み\n```{after}```\n"
+                       f"### 正規表現: {'使用する' if use_regex else '使用しない'}")
+        embed = Embed(title="辞書追加", description=description)
         await ctx.respond(embed=embed)
 
     @guild_dictionary.command(name="delete", description="辞書を削除する")
     async def delete(
             self,
-            ctx: ApplicationContext,
-            before: Option(str, "変換前の文字列")
+            ctx: BridgeCtx,
+            before: BridgeOption(str, "変換前の文字列")
     ):
         if not self.vm.guild_replacers.get(ctx.guild.id, before):
             await ctx.respond("辞書が存在しません")
@@ -478,31 +499,32 @@ class GuildCommands(commands.Cog):
     @guild_dictionary.command(name="list", description="辞書を表示する")
     async def dictionary_list(
             self,
-            ctx: ApplicationContext
+            ctx: BridgeCtx
     ):
         data = self.vm.guild_replacers.get(ctx.guild.id)
         if not data:
-            await ctx.send("辞書が存在しません")
+            await ctx.respond("辞書が存在しません")
             return
-        await ctx.send(f"{len(data)}件の辞書が登録されています")
+        await ctx.respond(f"{len(data)}件の辞書が登録されています")
         pagenator = list_pagenation(data.regex_replacements_str, data.simple_replacements)
-        await pagenator.respond(ctx.interaction)
+        await pagenator.respond(ctx)
 
     @guild_dictionary.command(name="update", description="辞書を更新する")
     async def update(
             self,
-            ctx: ApplicationContext,
-            old_before: Option(str, "変換前の文字列"),
-            new_before: Option(str, "変換前の文字列"),
-            after: Option(str, "変換後の文字列"),
-            use_regex: Option(bool, "正規表現を使用するか")
+            ctx: BridgeCtx,
+            old_before: BridgeOption(str, "変換前の文字列"),
+            new_before: BridgeOption(str, "変換前の文字列"),
+            after: BridgeOption(str, "変換後の文字列"),
+            use_regex: BridgeOption(bool, "正規表現を使用するか")
     ):
         if not self.vm.guild_replacers.get(ctx.guild.id, old_before):
             await ctx.respond("辞書が存在しません")
             return
         self.vm.guild_replacers.update(ctx.guild.id, old_before, new_before, after, use_regex)
-        embed = Embed(title="辞書更新",
-                      description=f"### 変更前単語\n```{old_before}```\n### 単語\n# ```{new_before}```\n### 読み\n# ```{after}```\n### 正規表現: {'使用する' if use_regex else '使用しない'}")
+        description = (f"### 変更前単語\n```{old_before}```\n### 単語\n```{new_before}```\n### 読み\n```{after}```\n"
+                       f"### 正規表現: {'使用する' if use_regex else '使用しない'}")
+        embed = Embed(title="辞書更新", description=description)
         await ctx.respond(embed=embed)
 
 

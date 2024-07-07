@@ -22,18 +22,23 @@ intents = discord.Intents(
 if not load_dotenv(verbose=True):
     with open(".env", "w", encoding="utf-8") as f:
         f.write("TOKEN=\n")
+        f.write("COMMAND_PREFIX=\n")
         f.write("TEST_GUILD=\n")
 token = os.getenv("TOKEN")
+prefix = os.getenv("COMMAND_PREFIX")
 if not token:
     print("Failed to load token")
-    raise FileNotFoundError("Failed to load token")
+    raise RuntimeError("Failed to load token")
+if not prefix:
+    print("Failed to load command prefix")
+    raise RuntimeError("Failed to load command prefix")
 if os.getenv("TEST_GUILD"):
     print("Starting as Test Bot")
     test_guild = [i for i in map(int, os.getenv("TEST_GUILD").split(","))]
-    bot = voicemanager.VoiceManagedBot(debug_guilds=test_guild, intents=intents)
+    bot = voicemanager.VoiceManagedBot(debug_guilds=test_guild, intents=intents, command_prefix=prefix)
 else:
     print("Starting as Public Bot")
-    bot = voicemanager.VoiceManagedBot(intents=intents)
+    bot = voicemanager.VoiceManagedBot(intents=intents, command_prefix=prefix)
 
 vm = bot.voice_manager
 database.DictionaryLoader.set_db_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dictionary.db"))
@@ -58,6 +63,10 @@ async def on_ready():
 @bot.event
 async def on_message(message: discord.Message):
     """Event handler for receiving message."""
+    if message.content.startswith(prefix):
+        await bot.process_commands(message)
+        return
+
     if vm.read_channel is None:
         return
 
@@ -133,13 +142,13 @@ async def say_clock():
             return
 
 
-@bot.slash_command(description="応答速度を確認する")
+@bot.bridge_command(description="応答速度を確認する")
 async def ping(ctx: ApplicationContext):
     """Check the response time of the bot."""
     await ctx.respond(f":ping_pong: {round(bot.latency * 1000, 2)}ms")
 
 
-@bot.slash_command(description="ボイスチャンネルに接続する")
+@bot.bridge_command(description="ボイスチャンネルに接続する")
 async def join(
         ctx: ApplicationContext,
         vc: Option(GuildChannel, channel_types=[ChannelType.voice], required=False, description="接続するVC"),
@@ -175,7 +184,7 @@ async def join(
         await ctx.respond(f"VCに接続中のメンバーがいません")
 
 
-@bot.slash_command(description="VCを切断する")
+@bot.bridge_command(description="VCを切断する")
 async def leave(ctx: ApplicationContext):
     """Disconnect from the voice channel."""
     if ctx.voice_client != vm.voice_client:
@@ -189,6 +198,42 @@ async def leave(ctx: ApplicationContext):
         await ctx.respond("接続されていません")
 
 
+class JoinButton(discord.ui.View):
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="参加する", style=discord.ButtonStyle.green)
+    async def join(self, button: discord.ui.Button, interaction: discord.Interaction):
+        if bot.voice_clients:
+            if bot.voice_clients[0] != vm.voice_client:
+                await interaction.response.send_message("エラーが発生しました\n再度実行してください", delete_after=10)
+                vm.voice_client = bot.voice_clients[0]
+            else:
+                await interaction.response.send_message(f"既に<#{vm.voice_client.channel.id}>に接続しています", delete_after=10)
+                return
+        if not interaction.user.voice:
+            await interaction.response.send_message("VCに参加してください", delete_after=10)
+            return
+        vc = interaction.user.voice.channel
+        await vm.connect(vc)
+        await interaction.response.send_message(f"<#{vc.id}>に接続しました", delete_after=10)
+        vm.read_channel = interaction.channel
+        vm.qclear()
+        vm.speak("接続しました", guild=interaction.guild.id)
+        say_clock.start()
+        vm.start_converter()
+
+
+@bot.bridge_command(name="crate-button", description="参加ボタンを作成する")
+async def create_button(ctx: ApplicationContext):
+    """Create a join button."""
+    button = discord.ui.Button(style=discord.ButtonStyle.green, label="参加する")
+    view = discord.ui.View()
+    view.add_item(button)
+    await ctx.respond("参加ボタン", view=view)
+
+
 bot.load_extension("cog")
 
 
@@ -198,3 +243,5 @@ def run(token: str):
 
 if __name__ == '__main__':
     run(token)
+    print(discord.ext.bridge.BridgeApplicationContext)
+    print(discord.ext.bridge.BridgeExtContext)
