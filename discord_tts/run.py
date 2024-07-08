@@ -1,15 +1,14 @@
-import io
 import os
 import queue
-import sqlite3
 from dotenv import load_dotenv
 import discord
-from discord import ApplicationContext, ChannelType, Embed
+from discord import ChannelType, Embed
 from discord.abc import GuildChannel
-from discord.ext import tasks, pages
-from discord.commands import SlashCommandGroup, Option
-from vv_wrapper import call, database
-import voicemanager
+from discord.ext import tasks
+from discord.ext.bridge import BridgeOption
+from vv_wrapper import database
+from util import BridgeCtx, JoinButton
+from voicemanager import VoiceManagedBot
 
 intents = discord.Intents(
     messages=True,
@@ -35,10 +34,10 @@ if not prefix:
 if os.getenv("TEST_GUILD"):
     print("Starting as Test Bot")
     test_guild = [i for i in map(int, os.getenv("TEST_GUILD").split(","))]
-    bot = voicemanager.VoiceManagedBot(debug_guilds=test_guild, intents=intents, command_prefix=prefix)
+    bot = VoiceManagedBot(debug_guilds=test_guild, intents=intents, command_prefix=prefix)
 else:
     print("Starting as Public Bot")
-    bot = voicemanager.VoiceManagedBot(intents=intents, command_prefix=prefix)
+    bot = VoiceManagedBot(intents=intents, command_prefix=prefix)
 
 vm = bot.voice_manager
 database.DictionaryLoader.set_db_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dictionary.db"))
@@ -52,6 +51,7 @@ async def on_ready():
     print(f"logged in as {bot.user}")
     print(f"guilds: {[(g.name, g.id) for g in bot.guilds]}")
     database.SettingLoader.create_table()
+    bot.add_view(JoinButton(bot, say_clock))
     for guild in bot.guilds:
         database.DictionaryLoader.create_table(guild.id)
         vm.set_replacer(guild.id)
@@ -122,6 +122,9 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
             if after.channel == before.channel:
                 return
             vm.speak(f"{replacer.replace(name)}さんが退出しました", guild=member.guild.id)
+            if len(vm.voice_client.channel.members) == 1:
+                await vm.disconnect()
+                say_clock.stop()
             return
 
 
@@ -143,16 +146,16 @@ async def say_clock():
 
 
 @bot.bridge_command(description="応答速度を確認する")
-async def ping(ctx: ApplicationContext):
+async def ping(ctx: BridgeCtx):
     """Check the response time of the bot."""
     await ctx.respond(f":ping_pong: {round(bot.latency * 1000, 2)}ms")
 
 
 @bot.bridge_command(description="ボイスチャンネルに接続する")
 async def join(
-        ctx: ApplicationContext,
-        vc: Option(GuildChannel, channel_types=[ChannelType.voice], required=False, description="接続するVC"),
-        force: Option(bool, default=False, description="他で接続中でも強制的に接続させます")
+        ctx: BridgeCtx,
+        vc: BridgeOption(GuildChannel, channel_types=[ChannelType.voice], required=False, description="接続するVC"),
+        force: BridgeOption(bool, default=False, description="他で接続中でも強制的に接続させます")
 ):
     """Connect to the voice channel."""
     if ctx.voice_client != vm.voice_client:
@@ -185,7 +188,7 @@ async def join(
 
 
 @bot.bridge_command(description="VCを切断する")
-async def leave(ctx: ApplicationContext):
+async def leave(ctx: BridgeCtx):
     """Disconnect from the voice channel."""
     if ctx.voice_client != vm.voice_client:
         vm.voice_client = ctx.voice_client
@@ -198,40 +201,12 @@ async def leave(ctx: ApplicationContext):
         await ctx.respond("接続されていません")
 
 
-class JoinButton(discord.ui.View):
-
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="参加する", style=discord.ButtonStyle.green)
-    async def join(self, button: discord.ui.Button, interaction: discord.Interaction):
-        if bot.voice_clients:
-            if bot.voice_clients[0] != vm.voice_client:
-                await interaction.response.send_message("エラーが発生しました\n再度実行してください", delete_after=10)
-                vm.voice_client = bot.voice_clients[0]
-            else:
-                await interaction.response.send_message(f"既に<#{vm.voice_client.channel.id}>に接続しています", delete_after=10)
-                return
-        if not interaction.user.voice:
-            await interaction.response.send_message("VCに参加してください", delete_after=10)
-            return
-        vc = interaction.user.voice.channel
-        await vm.connect(vc)
-        await interaction.response.send_message(f"<#{vc.id}>に接続しました", delete_after=10)
-        vm.read_channel = interaction.channel
-        vm.qclear()
-        vm.speak("接続しました", guild=interaction.guild.id)
-        say_clock.start()
-        vm.start_converter()
-
-
-@bot.bridge_command(name="crate-button", description="参加ボタンを作成する")
-async def create_button(ctx: ApplicationContext):
+@bot.bridge_command(name="create-button", description="参加ボタンを作成する")
+async def create_button(ctx: BridgeCtx):
     """Create a join button."""
-    button = discord.ui.Button(style=discord.ButtonStyle.green, label="参加する")
-    view = discord.ui.View()
-    view.add_item(button)
-    await ctx.respond("参加ボタン", view=view)
+    view = JoinButton(bot, say_clock)
+    embed = Embed(title="参加ボタン", description="ワンクリックでVCに参加します")
+    await ctx.respond(embed=embed, view=view)
 
 
 bot.load_extension("cog")
@@ -243,5 +218,3 @@ def run(token: str):
 
 if __name__ == '__main__':
     run(token)
-    print(discord.ext.bridge.BridgeApplicationContext)
-    print(discord.ext.bridge.BridgeExtContext)

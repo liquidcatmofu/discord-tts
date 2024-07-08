@@ -1,4 +1,5 @@
 from json import dumps
+from math import ceil
 import discord
 from discord import Embed
 from discord.ext import commands, bridge
@@ -6,6 +7,7 @@ from discord.ext.bridge import BridgeContext, BridgeApplicationContext, BridgeEx
 from discord.ext.pages import Paginator, Page
 # from discord.commands import slash_command, SlashCommandGroup, Option
 import voicemanager
+from util import BridgeCtx
 
 styles: dict[str, str] = {}
 
@@ -14,29 +16,46 @@ async def style_choices(ctx: discord.AutocompleteContext):
     return list(styles)
 
 
-def list_pagenation(regex: dict, simple: dict) -> Paginator:
+def list_pagination(regex: dict, simple: dict) -> Paginator:
     pages = []
+    embeds = []
     for k, v in regex.items():
         embed = Embed(title="辞書一覧")
-        embed.add_field(name="変換前", value=k)
-        embed.add_field(name="変換後", value=v)
+        embed.add_field(name="単語", value=k)
+        embed.add_field(name="読み", value=v)
         embed.add_field(name="正規表現", value="使用する")
-        pages.append(Page(embeds=[embed]))
+        embeds.append(embed)
     for k, v in simple.items():
         embed = Embed(title="辞書一覧")
-        embed.add_field(name="変換前", value=k)
-        embed.add_field(name="変換後", value=v)
+        embed.add_field(name="単語", value=k)
+        embed.add_field(name="読み", value=v)
         embed.add_field(name="正規表現", value="使用しない")
-        pages.append(Page(embeds=[embed]))
+        embeds.append(embed)
+    for i in range(ceil(len(embeds) / 4)):
+        pages.append(Page(embeds=embeds[i * 4: (i + 1) * 4]))
     return Paginator(pages=pages)
 
 
-class BridgeCtx(BridgeApplicationContext, BridgeExtContext):
-    """
-    Used instead of BridgeContext
-    because BridgeContext causes annotation errors
-    """
-    pass
+def mention_pagination(title: str, ids: list[int],
+                       _type: str) -> Paginator:
+    pages = []
+    if not ids:
+        return Paginator(pages=[Page(embeds=[Embed(title=title, description="登録されていません")])])
+    if _type == "user":
+        conv = lambda x: f"<@{x}>"
+    elif _type == "role":
+        conv = lambda x: f"<@&{x}>"
+    else:
+        raise TypeError(f"invalid type: {_type.__class__.__name__}")
+    for i in range(ceil(len(ids) / 10)):
+        embed = Embed(title=title)
+        value = []
+        for j, mention in enumerate(ids[i * 10: (i + 1) * 10], 1):
+            value.append(f"{i}. {conv(mention)}")
+        embed.add_field(name=f"{len(ids)}件中 {i * 10 + 1} ~ {min(i * 10 + 10, len(ids))} 件目を表示",
+                        value="\n".join(value))
+        pages.append(Page(embeds=[embed]))
+    return Paginator(pages=pages)
 
 
 class UserCommands(commands.Cog):
@@ -72,7 +91,7 @@ class UserCommands(commands.Cog):
             await ctx.respond("無効な値です")
             return
         self.vm.user_settings.update(user_id, "speaker", speaker_id)
-        await ctx.respond(f"{ctx.author.display_name}さんの話者を{speaker}に変更しました")
+        await ctx.respond(f"<@{ctx.author.id}>さんの話者を{speaker}に変更しました")
 
     @user_setting.command(name="change-speed", description="再生速度を変更")
     async def change_speed(
@@ -85,7 +104,7 @@ class UserCommands(commands.Cog):
             await ctx.respond("再生速度は0.5から2.0の間で指定してください")
             return
         self.vm.user_settings.update(user_id, "speed", speed)
-        await ctx.respond(f"{ctx.author.display_name}の再生速度を{speed}に変更しました")
+        await ctx.respond(f"<@{ctx.author.id}>さんの再生速度を{speed}に変更しました")
 
     @user_setting.command(name="change-pitch", description="音程を変更")
     async def change_pitch(
@@ -98,7 +117,7 @@ class UserCommands(commands.Cog):
             await ctx.respond("音程は-0.15から0.15の間で指定してください")
             return
         self.vm.user_settings.update(user_id, "pitch", pitch)
-        await ctx.respond(f"{ctx.author.display_name}の音程を{pitch}に変更しました")
+        await ctx.respond(f"<@{ctx.author.id}>さんの音程を{pitch}に変更しました")
 
     @user_setting.command(name="change-intonation", description="抑揚を変更")
     async def change_intonation(
@@ -111,7 +130,7 @@ class UserCommands(commands.Cog):
             await ctx.respond("抑揚は0.0から2.0の間で指定してください")
             return
         self.vm.user_settings.update(user_id, "intonation", intonation)
-        await ctx.respond(f"{ctx.author.display_name}の抑揚を{intonation}に変更しました")
+        await ctx.respond(f"<@{ctx.author.id}>さんの抑揚を{intonation}に変更しました")
 
     @user_setting.command(name="change-volume", description="音量を変更")
     async def change_volume(
@@ -124,7 +143,7 @@ class UserCommands(commands.Cog):
             await ctx.respond("音量は0.0から2.0の間で指定してください")
             return
         self.vm.user_settings.update(user_id, "volume", volume)
-        await ctx.respond(f"{ctx.author.display_name}の音量を{volume}に変更しました")
+        await ctx.respond(f"<@{ctx.author.id}>さんの音量を{volume}に変更しました")
 
     @user_setting.command(name="show-setting", description="参加/退出読み上げを変更")
     async def show_setting(
@@ -161,10 +180,10 @@ class UserCommands(commands.Cog):
             await ctx.respond("辞書が既に存在します")
             return
         self.vm.user_replacers.add(user_id, before, after, use_regex)
-        embed = Embed(
-            title="ユーザー辞書追加",
-            description=f"変換前: {before}\n変換後: {after}\n正規表現: {'使用する' if use_regex else '使用しない'}"
-        )
+        embed = Embed(title="ユーザー辞書追加")
+        embed.add_field(name="単語", value=before)
+        embed.add_field(name="読み", value=after)
+        embed.add_field(name="正規表現", value="使用する" if use_regex else "使用しない")
         await ctx.respond(embed=embed)
 
     @user_dictionary.command(name="delete", description="ユーザー辞書を削除する")
@@ -178,10 +197,8 @@ class UserCommands(commands.Cog):
             await ctx.respond("辞書が存在しません")
             return
         self.vm.user_replacers.delete(user_id, before)
-        embed = Embed(
-            title="ユーザー辞書削除",
-            description=f"変換前: {before}"
-        )
+        embed = Embed(title="ユーザー辞書削除")
+        embed.add_field(name="単語", value=before)
         await ctx.respond(embed=embed)
 
     @user_dictionary.command(name="list", description="ユーザー辞書を表示する")
@@ -196,7 +213,7 @@ class UserCommands(commands.Cog):
             await ctx.respond("辞書が存在しません")
             return
         await ctx.respond(f"{len(data)}件の辞書が登録されています")
-        pagenator = list_pagenation(data.regex_replacements_str, data.simple_replacements)
+        pagenator = list_pagination(data.regex_replacements_str, data.simple_replacements)
         await pagenator.respond(ctx)
 
     @user_dictionary.command(name="update", description="ユーザー辞書を更新する")
@@ -213,10 +230,11 @@ class UserCommands(commands.Cog):
             await ctx.respond("辞書が存在しません")
             return
         self.vm.user_replacers.update(user_id, old_before, new_before, after, use_regex)
-        embed = Embed(
-            title="ユーザー辞書更新",
-            description=f"変換前: {old_before}\n変換後: {new_before}\n正規表現: {'使用する' if use_regex else '使用しない'}"
-        )
+        embed = Embed(title="ユーザー辞書更新")
+        embed.add_field(name="単語", value=old_before)
+        embed.add_field(name="新しい単語", value=new_before)
+        embed.add_field(name="読み", value=after)
+        embed.add_field(name="正規表現", value="使用する" if use_regex else "使用しない")
         await ctx.respond(embed=embed)
 
 
@@ -331,7 +349,7 @@ class GuildCommands(commands.Cog):
         self.vm.guild_settings.update(ctx.guild.id, "read_nick", read_nick)
         await ctx.respond(f"ニックネームを読み上げる設定を{read_nick}に変更しました")
 
-    @guild_setting.command(name="add-ignore-user", description="読み上げを無視するユーザーを追加")
+    @guild_setting.command(name="ignore-user-add", description="読み上げを無視するユーザーを追加")
     async def add_ignore_user(
             self,
             ctx: BridgeCtx,
@@ -343,9 +361,12 @@ class GuildCommands(commands.Cog):
             return
         ignores.append(user.id)
         self.vm.guild_settings.update(ctx.guild.id, "ignore_users", dumps(ignores))
-        await ctx.respond(f"読み上げを無視するユーザーに`{user.name}`さんを追加しました\n現在{len(ignores)}人が登録されています")
+        embed = Embed(title="読み上げ無視ユーザー追加")
+        embed.add_field(name="ユーザー", value=f"<@{user.id}>")
+        embed.add_field(name="現在の登録数", value=f"{len(ignores)}人")
+        await ctx.respond(embed=embed)
 
-    @guild_setting.command(name="remove-ignore-user", description="読み上げを無視するユーザーを削除")
+    @guild_setting.command(name="ignore-user-remove", description="読み上げを無視するユーザーを削除")
     async def remove_ignore_user(
             self,
             ctx: BridgeCtx,
@@ -357,35 +378,34 @@ class GuildCommands(commands.Cog):
             return
         ignores.remove(user.id)
         self.vm.guild_settings.update(ctx.guild.id, "ignore_users", dumps(ignores))
-        await ctx.respond(f"読み上げを無視するユーザーから`{user.name}`さんを削除しました\n現在{len(ignores)}人が登録されています")
+        embed = Embed(title="読み上げ無視ユーザー削除")
+        embed.add_field(name="ユーザー", value=f"<@{user.id}>")
+        embed.add_field(name="現在の登録数", value=f"{len(ignores)}人")
+        await ctx.respond(embed=embed)
 
-    @guild_setting.command(name="ignore-user-list", description="読み上げを無視するユーザーを表示")
+    @guild_setting.command(name="ignore-user-show", description="読み上げを無視するユーザーを表示")
     async def ignore_user_list(
             self,
             ctx: BridgeCtx,
             remove_notfound: BridgeOption(bool, "存在しないユーザーを削除するか", default=False)
     ):
         ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_users
-        if not ignores:
-            await ctx.respond("登録されているユーザーはいません")
-            return
-        users = []
-        notfound = []
-        for i in ignores:
-            user = ctx.guild.get_member(i)
-            if user:
-                users.append(user.name)
-            elif remove_notfound:
-                ignores.remove(i)
-                notfound.append(i)
-            else:
-                users.append("不明なユーザー")
-        await ctx.respond("### 除外されたユーザー\n" + "\n".join([f"{i}. {user}" for i, user in enumerate(users, 1)]))
-        if notfound:
-            self.vm.guild_settings.update(ctx.guild.id, "ignore_users", dumps(ignores))
-            await ctx.channel.send(f"存在しないユーザーを削除しました")
+        await ctx.defer()
+        if remove_notfound:
+            notfound = False
+            for i in ignores:
+                user = ctx.guild.get_member(i)
+                if not user:
+                    ignores.remove(i)
+                    notfound = True
+            if notfound:
+                self.vm.guild_settings.update(ctx.guild.id, "ignore_users", dumps(ignores))
+                await ctx.channel.send(f"存在しないユーザーを削除しました")
+        paginator = mention_pagination("除外されたユーザー", ignores, "user")
+        await paginator.respond(ctx)
 
-    @guild_setting.command(name="add-ignore-role", description="読み上げを無視するロールを追加")
+
+    @guild_setting.command(name="ignore-role-add", description="読み上げを無視するロールを追加")
     async def add_ignore_role(
             self,
             ctx: BridgeCtx,
@@ -397,9 +417,12 @@ class GuildCommands(commands.Cog):
             return
         ignores.append(role.id)
         self.vm.guild_settings.update(ctx.guild.id, "ignore_roles", dumps(ignores))
-        await ctx.respond(f"読み上げを無視するロールに`{role.name}`を追加しました\n現在{len(ignores)}個が登録されています")
+        embed = Embed(title="読み上げ無視ロール追加")
+        embed.add_field(name="ロール", value=f"<@&{role.id}>")
+        embed.add_field(name="現在の登録数", value=f"{len(ignores)}個")
+        await ctx.respond(embed=embed)
 
-    @guild_setting.command(name="remove-ignore-role", description="読み上げを無視するロールを削除")
+    @guild_setting.command(name="ignore-role-remove", description="読み上げを無視するロールを削除")
     async def remove_ignore_role(
             self,
             ctx: BridgeCtx,
@@ -411,26 +434,26 @@ class GuildCommands(commands.Cog):
             return
         ignores.remove(role.id)
         self.vm.guild_settings.update(ctx.guild.id, "ignore_roles", dumps(ignores))
-        await ctx.respond(f"読み上げを無視するロールから`{role.name}`を削除しました\n現在{len(ignores)}個が登録されています")
+        embed = Embed(title="読み上げ無視ロール削除")
+        embed.add_field(name="ロール", value=f"<@&{role.id}>")
+        embed.add_field(name="現在の登録数", value=f"{len(ignores)}個")
+        await ctx.respond(embed=embed)
 
-    @guild_setting.command(name="ignore-role-list", description="読み上げを無視するロールを表示")
+    @guild_setting.command(name="ignore-role-show", description="読み上げを無視するロールを表示")
     async def ignore_role_list(self, ctx: BridgeCtx):
         ignores = self.vm.guild_settings.get(ctx.guild.id).ignore_roles
-        if not ignores:
-            await ctx.respond("登録されているロールはありません")
-            return
-        roles = []
+        notfound = False
         for i in ignores:
             role = ctx.guild.get_role(i)
-            if role:
-                roles.append(role.name)
-            else:
-                roles.append("不明なロール")
+            if not role:
                 ignores.remove(i)
-        await ctx.respond("### 除外されたロール\n" + "\n".join([f"{i}. {role}" for i, role in enumerate(roles, 1)]))
-        if len(ignores) != len(roles):
+                notfound = True
+        if notfound:
             self.vm.guild_settings.update(ctx.guild.id, "ignore_roles", dumps(ignores))
             await ctx.channel.send("存在しないロールを削除しました")
+        paginator = mention_pagination("除外されたロール", ignores, "role")
+        await paginator.respond(ctx)
+
 
     @guild_setting.command(name="show-setting", description="サーバー設定を表示")
     async def show_setting(
@@ -477,7 +500,10 @@ class GuildCommands(commands.Cog):
         self.vm.guild_replacers.add(ctx.guild.id, before, after, use_regex)
         description = (f"### 単語\n```{before}```\n### 読み\n```{after}```\n"
                        f"### 正規表現: {'使用する' if use_regex else '使用しない'}")
-        embed = Embed(title="辞書追加", description=description)
+        embed = Embed(title="辞書追加")
+        embed.add_field(name="単語", value=before)
+        embed.add_field(name="読み", value=after)
+        embed.add_field(name="正規表現", value="使用する" if use_regex else "使用しない")
         await ctx.respond(embed=embed)
 
     @guild_dictionary.command(name="delete", description="辞書を削除する")
@@ -490,10 +516,8 @@ class GuildCommands(commands.Cog):
             await ctx.respond("辞書が存在しません")
             return
         self.vm.guild_replacers.delete(ctx.guild.id, before)
-        embed = Embed(
-            title="サーバー辞書削除",
-            description=f"変換前: {before}"
-        )
+        embed = Embed(title="サーバー辞書削除")
+        embed.add_field(name="単語", value=before)
         await ctx.respond(embed=embed)
 
     @guild_dictionary.command(name="list", description="辞書を表示する")
@@ -506,7 +530,7 @@ class GuildCommands(commands.Cog):
             await ctx.respond("辞書が存在しません")
             return
         await ctx.respond(f"{len(data)}件の辞書が登録されています")
-        pagenator = list_pagenation(data.regex_replacements_str, data.simple_replacements)
+        pagenator = list_pagination(data.regex_replacements_str, data.simple_replacements)
         await pagenator.respond(ctx)
 
     @guild_dictionary.command(name="update", description="辞書を更新する")

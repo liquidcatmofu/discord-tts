@@ -1,5 +1,4 @@
 import io
-from json import loads, dumps
 import re
 from queue import Empty, Queue
 from subprocess import DEVNULL
@@ -176,9 +175,9 @@ class VoiceManager:
 
             text = reply + text
             print(text)
-            text = re.split("[。、\n]", text)
+            split = re.split("[。、\n]", text)
 
-            for t in text:
+            for t in split:
                 if user is not None:
                     wav = call.VoiceVox.synth_from_settings(t, user_settings)
                 elif guild is not None:
