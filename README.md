@@ -37,7 +37,6 @@ PythonのDiscord APIのPycordを使用し、VoiceVoxの音声で読み上げを�
 ## Pythonのインストール
 
 開発に使用したバージョンは3.11.7ですが、3.11以上であれば動くはずです。
-セキュリティの問題のため、マイナーバージョンは最新のものを用いることを推奨します。
 
 ### Windowsの場合
 [こちら](https://www.python.org/downloads/)からお使いの環境に合ったPythonのインストーラーをダウンロードし、インストールしてください。
@@ -52,6 +51,6 @@ PyCharm等のIDEでクローンします。依存関係のインストールま�
 
 IDEを用いない場合は以下のコマンドを実行します。
 ```
-$ git clone https://github.com/liquidcatmofu/discord-tts
+$ git clone https://github.com/liquidcatmofu/discord-tts.git
 ```
 
