@@ -47,7 +47,7 @@ $ py　-0p
 
 一覧に3.11以上のバージョンがない場合、またはpyが存在しない場合は以下のコマンドを実行します。
 ```cmd
-$ winget show --versions --id Python.Python3.11
+$ winget install -s winget -e --id Python.Python.3.11
 ```
 ユーザーアカウント制御の画面が出る場合がありますが許可してください。インストーラが起動し、インストールが完了します。
 
