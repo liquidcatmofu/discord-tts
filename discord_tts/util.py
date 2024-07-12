@@ -1,7 +1,8 @@
 import discord
 from discord.ext import tasks
 from discord.ext.bridge import BridgeApplicationContext, BridgeExtContext
-from voicemanager import VoiceManager, VoiceManagedBot
+
+from voicemanager import VoiceManagedBot
 
 
 class BridgeCtx(BridgeApplicationContext, BridgeExtContext):

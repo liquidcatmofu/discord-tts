@@ -1,8 +1,8 @@
-from dataclasses import dataclass
-from json import loads, dumps
 import os
 import re
 import sqlite3
+from dataclasses import dataclass
+from json import loads
 from urllib.parse import urlparse
 
 
@@ -70,13 +70,15 @@ class Replacer:
             text: str,
             *,
             url_replacement: str | None = "URL省略",
-            code_block_replacement: str | None = "コード省略"
+            code_block_replacement: str | None = "コード省略",
+            custom_emoji_replacement: str | None = ""
     ) -> str:
         """
         Replace the text.
         :param text: Text to be replaced
         :param url_replacement: Replacement for URLs
         :param code_block_replacement: Replacement for code blocks
+        :param custom_emoji_replacement: Replacement for custom emojis (if None, use emoji name)
         :return: Replaced text
         """
         # 正規表現を使用する置換を一括で実行
@@ -89,6 +91,7 @@ class Replacer:
             text = self.replace_urls(text, url_replacement)
         if code_block_replacement:
             text = self.replace_code_blocks(text, code_block_replacement)
+        text = self.replace_custom_emoji(text, custom_emoji_replacement)
         return text
 
     def update_replacements(self, regex_replacements: dict[str: str], simple_replacements: dict[str: str]) -> None:
@@ -135,7 +138,7 @@ class Replacer:
         return text
 
     @staticmethod
-    def replace_custom_emoji(text: str, replacement: str) -> str:
+    def replace_custom_emoji(text: str, replacement: str | None = None) -> str:
         """
         Replace custom emojis in the text.
         :param text: Text to be replaced
@@ -143,10 +146,10 @@ class Replacer:
         :return: Replaced text
         """
         # カスタム絵文字の正規表現パターン
-        emoji_pattern = r'<a?:[a-zA-Z0-9]+:[0-9]+>'
+        emoji_pattern = r'<a?:[a-zA-Z0-9_]+:[0-9]+>'
         emojis = re.findall(emoji_pattern, text)
         for emoji in emojis:
-            text = text.replace(emoji, replacement)
+            text = text.replace(emoji, (replacement if replacement is not None else emoji.split(":")[1]))
         return text
 
     def __bool__(self):
@@ -187,7 +190,7 @@ class DictionaryLoader:
     """
     dictionary database wrapper
     """
-    file_path: str | os.PathLike = "../dictionary.db"
+    file_path: str | os.PathLike = "dictionary.db"
 
     # replacer: EfficientReplacer | None = None
 

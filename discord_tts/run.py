@@ -1,12 +1,14 @@
 import os
 import queue
-from dotenv import load_dotenv
+
 import discord
 from discord import ChannelType, Embed
 from discord.abc import GuildChannel
 from discord.ext import tasks
 from discord.ext.bridge import BridgeOption
-from vv_wrapper import database
+from dotenv import load_dotenv
+
+import database
 from util import BridgeCtx, JoinButton
 from voicemanager import VoiceManagedBot
 
@@ -125,6 +127,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
             if len(vm.voice_client.channel.members) == 1:
                 await vm.disconnect()
                 say_clock.stop()
+                print("Disconnected")
             return
 
 

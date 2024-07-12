@@ -1,8 +1,10 @@
-from dataclasses import dataclass
-import subprocess
-import requests
 import json
-from vv_wrapper import database as db
+import subprocess
+from dataclasses import dataclass
+
+import requests
+
+import database as db
 
 host = "127.0.0.1"
 port = 50021

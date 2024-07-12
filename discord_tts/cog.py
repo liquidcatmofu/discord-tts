@@ -1,10 +1,12 @@
 from json import dumps
 from math import ceil
+
 import discord
 from discord import Embed
 from discord.ext import commands, bridge
-from discord.ext.bridge import BridgeContext, BridgeApplicationContext, BridgeExtContext, BridgeOption
+from discord.ext.bridge import BridgeContext, BridgeOption
 from discord.ext.pages import Paginator, Page
+
 # from discord.commands import slash_command, SlashCommandGroup, Option
 import voicemanager
 from util import BridgeCtx
@@ -404,7 +406,6 @@ class GuildCommands(commands.Cog):
         paginator = mention_pagination("除外されたユーザー", ignores, "user")
         await paginator.respond(ctx)
 
-
     @guild_setting.command(name="ignore-role-add", description="読み上げを無視するロールを追加")
     async def add_ignore_role(
             self,
@@ -453,7 +454,6 @@ class GuildCommands(commands.Cog):
             await ctx.channel.send("存在しないロールを削除しました")
         paginator = mention_pagination("除外されたロール", ignores, "role")
         await paginator.respond(ctx)
-
 
     @guild_setting.command(name="show-setting", description="サーバー設定を表示")
     async def show_setting(

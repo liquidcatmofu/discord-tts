@@ -1,12 +1,15 @@
 import io
 import re
-from queue import Empty, Queue
-from subprocess import DEVNULL
 import threading
 import time
+from queue import Empty, Queue
+from subprocess import DEVNULL
+
 import discord
 from discord.ext import bridge
-from vv_wrapper import call, database
+
+import call
+import database
 
 
 class VoiceManagedBot(bridge.Bot):
@@ -175,6 +178,8 @@ class VoiceManager:
 
             text = reply + text
             print(text)
+            if not text:
+                continue
             split = re.split("[。、\n]", text)
 
             for t in split:
