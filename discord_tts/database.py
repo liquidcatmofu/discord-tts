@@ -69,8 +69,8 @@ class Replacer:
             self,
             text: str,
             *,
-            url_replacement: str | None = "URL省略",
-            code_block_replacement: str | None = "コード省略"
+            url_replacement: Optional[str] = "URL省略",
+            code_block_replacement: Optional[str] = "コード省略"
     ) -> str:
         """
         Replace the text.
@@ -89,6 +89,7 @@ class Replacer:
             text = self.replace_urls(text, url_replacement)
         if code_block_replacement:
             text = self.replace_code_blocks(text, code_block_replacement)
+        text = self.replace_custom_emoji(text)
         return text
 
     def update_replacements(self, regex_replacements: dict[str: str], simple_replacements: dict[str: str]) -> None:
@@ -466,7 +467,7 @@ class ReplacerHolder(BaseDataHolder):
     table: str
     _replacers: dict[int: Replacer]
 
-    def __getitem__(self, item) -> Replacer | None:
+    def __getitem__(self, item) -> Optional[Replacer]:
         return self._replacers[item]
 
     def __setitem__(self, key, value):
@@ -475,7 +476,7 @@ class ReplacerHolder(BaseDataHolder):
     def __repr__(self):
         return f"database.ReplacerHolder({self.table}, {self._replacers})"
 
-    def get(self, id: int, auto_fetch: bool = True, auto_create: bool = True) -> Replacer | None:
+    def get(self, id: int, auto_fetch: bool = True, auto_create: bool = True) -> Optional[Replacer]:
         """
         Get the replacer.
         :param id: Discord guild id or user id
