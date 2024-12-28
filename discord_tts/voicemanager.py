@@ -1,36 +1,43 @@
 import io
 import re
-import threading
-import time
 from queue import Empty, Queue
 from subprocess import DEVNULL
-
+import threading
+import time
+import warnings
 import discord
 from discord.ext import bridge
-
-import call
-import database
+from vv_wrapper import call, database
 
 
-class VoiceManagedBot(bridge.Bot):
+GuildID = int
+
+
+class VoiceManagedBot(bridge.AutoShardedBot):
     """A subclass of discord.Bot that has a VoiceManager instance."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        print(self.shard_ids, self.shard_count)
         self.voice_manager: VoiceManager = VoiceManager(self)
 
 
 class VoiceManager:
     """Manages voice connections and text-to-speech conversion."""
-    def __init__(self, bot: discord.Bot):
-        self.bot: discord.Bot = bot
-        self.read_channel: discord.TextChannel | None = None
-        self.speak_channel: discord.VoiceChannel | None = None
-        self.voice_client: discord.VoiceClient | None = None
+    def __init__(self, bot: discord.Bot | discord.AutoShardedBot):
+        self.bot: discord.Bot | discord.AutoShardedBot = bot
+        # self.read_channel: discord.TextChannel | None = None
+        # self.speak_channel: discord.VoiceChannel | None = None
+        # self.voice_client: discord.VoiceClient | None = None
+
+        self.read_channels: dict[GuildID, discord.TextChannel] = {}
+        self.speak_channels: dict[GuildID, discord.VoiceChannel] = {}
+        self.voice_clients: dict[GuildID, discord.VoiceClient] = {}
 
         self.speak_message_q: Queue[discord.Message | dict[str: str | int]] = Queue()
         self.speak_source_q: Queue[discord.AudioSource] = Queue()
         self.converter_loop: bool = True
         self.converter_thread: threading.Thread | None = None
+        self.converter_interval: float = 0.1
 
         self.user_replacers: database.ReplacerHolder = database.ReplacerHolder("user", {})
         self.guild_replacers: database.ReplacerHolder = database.ReplacerHolder("guild", {})
@@ -80,11 +87,11 @@ class VoiceManager:
         Stop the voice manager.
         :return:
         """
-        await self.disconnect()
+        await self.disconnect(-1)
         self.qclear()
-        self.voice_client = None
-        self.read_channel = None
-        self.speak_channel = None
+        self.voice_clients.clear()
+        self.read_channels.clear()
+        self.speak_channels.clear()
 
     def qclear(self):
         """
@@ -95,29 +102,42 @@ class VoiceManager:
         self.speak_message_q = Queue()
         self.speak_source_q = Queue()
 
-    async def disconnect(self):
+    async def disconnect(self, guild_id: int):
         """
         Disconnect the voice client.
+        :param guild_id: discord guild id, if -1, disconnect all voice clients.
         :return:
         """
-        if self.voice_client is not None:
-            self.stop_converter()
-            await self.voice_client.disconnect()
-            self.voice_client = None
-            self.start_converter()
+        if self.voice_clients:
 
-    async def connect(self, channel: discord.VoiceChannel) -> discord.Client:
+            if guild_id > 0:
+                await self.voice_clients[guild_id].disconnect()
+                self.voice_clients.pop(guild_id)
+            else:
+                self.stop_converter()
+                self.qclear()
+                for vc in self.voice_clients.values():
+                    await vc.disconnect()
+                self.voice_clients.clear()
+            # self.start_converter()
+        else:
+            warnings.warn("No voice client to disconnect", RuntimeWarning)
+            print(guild_id)
+
+    async def connect(self, channel: discord.VoiceChannel, guild_id: int) -> discord.VoiceClient:
         """
         Connect to a voice channel.
-        :param channel:
+        :param channel: discord voice channel
+        :param guild_id: discord guild id
         :return:
         """
-        if self.voice_client is None:
-            self.voice_client = await channel.connect()
+        if self.voice_clients.get(guild_id) is None:
+            self.voice_clients[guild_id] = await channel.connect()
         else:
-            await self.voice_client.move_to(channel)
-        self.start_converter()
-        return self.voice_client
+            await self.voice_clients[guild_id].move_to(channel)
+        if self.converter_thread is None or not self.converter_thread.is_alive():
+            self.start_converter()
+        return self.voice_clients[guild_id]
 
     def _converter(self):
         """
@@ -178,8 +198,6 @@ class VoiceManager:
 
             text = reply + text
             print(text)
-            if not text:
-                continue
             split = re.split("[。、\n]", text)
 
             for t in split:
@@ -192,7 +210,7 @@ class VoiceManager:
                 source = discord.FFmpegOpusAudio(io.BytesIO(wav), pipe=True, stderr=DEVNULL)
                 self.speak_source_q.put(source)
 
-            time.sleep(0.3)
+            time.sleep(self.converter_interval)
 
     def start_converter(self):
         """
