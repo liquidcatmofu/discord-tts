@@ -8,9 +8,9 @@ from discord.ext import tasks
 from discord.ext.bridge import BridgeOption
 from dotenv import load_dotenv
 
-import database
 from util import BridgeCtx, JoinButton
 from voicemanager import VoiceManagedBot
+from vv_wrapper import database
 
 intents = discord.Intents(
     messages=True,
@@ -47,7 +47,8 @@ if os.getenv("TEST_GUILD"):
     else:
         shard_count = len(test_guild)
         shard_ids = None
-    bot = VoiceManagedBot(debug_guilds=test_guild, intents=intents, command_prefix=prefix, shard_ids=shard_ids, shard_count=shard_count)
+    bot = VoiceManagedBot(debug_guilds=test_guild, intents=intents, command_prefix=prefix, shard_ids=shard_ids,
+                          shard_count=shard_count)
 else:
     print("Starting as Public Bot")
     shard_count = int(os.getenv("SHARD_COUNT"))
@@ -59,6 +60,7 @@ else:
 
 vm = bot.voice_manager
 database.DictionaryLoader.set_db_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dictionary.db"))
+
 
 # group_dictionary = SlashCommandGroup("dictionary", "辞書操作コマンド")
 
@@ -150,7 +152,6 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
             if len(client.channel.members) == 1:
                 await vm.disconnect(guild_id)
                 say_clock.stop()
-                print("Disconnected")
             return
 
 

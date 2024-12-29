@@ -1,5 +1,4 @@
 import discord
-from aiohttp.log import client_logger
 from discord.ext import tasks
 from discord.ext.bridge import BridgeApplicationContext, BridgeExtContext
 
@@ -63,6 +62,7 @@ class JoinButton(discord.ui.View):
                     delete_after=10
                 )
                 for vc in self.bot.voice_clients:
+                    # bot.voice_clients is a list of VoiceClient objects
                     if vc.guild == interaction.guild:
                         self.vm.voice_clients[interaction.guild.id] = vc
                         break

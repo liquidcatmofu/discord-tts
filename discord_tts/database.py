@@ -1,10 +1,11 @@
-from dataclasses import dataclass
-from json import loads, dumps
 import os
 import re
 import sqlite3
-from urllib.parse import urlparse
+from dataclasses import dataclass
+from json import loads
 from typing import Optional
+from urllib.parse import urlparse
+
 
 class SQLiteWrapper:
     def __init__(self, database: str | os.PathLike) -> None:
@@ -55,6 +56,7 @@ class Replacer:
     Efficient text replacer.
     replace text with regex and simple replacements.
     """
+
     def __init__(self, regex_replacements: dict[str: str], simple_replacements: dict[str: str]) -> None:
         """
         Set the replacements.

@@ -62,7 +62,7 @@ def mention_pagination(title: str, ids: list[int],
 
 class UserCommands(commands.Cog):
 
-    def __init__(self, bot: discord.Bot, vm: voicemanager.VoiceManager):
+    def __init__(self, bot: discord.Bot | discord.AutoShardedBot, vm: voicemanager.VoiceManager):
         self.bot = bot
         self.vm: voicemanager.VoiceManager = vm
 
@@ -242,7 +242,7 @@ class UserCommands(commands.Cog):
 
 class GuildCommands(commands.Cog):
 
-    def __init__(self, bot: discord.Bot, vm: voicemanager.VoiceManager):
+    def __init__(self, bot: discord.Bot | discord.AutoShardedBot, vm: voicemanager.VoiceManager):
         self.bot = bot
         self.vm: voicemanager.VoiceManager = vm
 

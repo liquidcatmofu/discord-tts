@@ -1,10 +1,10 @@
 import json
 import subprocess
 from dataclasses import dataclass
+from typing import Optional
 
 import requests
-
-import database as db
+from vv_wrapper import database as db
 
 host = "127.0.0.1"
 port = 50021
@@ -77,7 +77,7 @@ class VoiceVox:
     post_phoneme_length = 0.1
 
     @classmethod
-    def set_host(cls, host: str | None = None, port: int | None = None) -> None:
+    def set_host(cls, host: Optional[str] = None, port: Optional[int] = None) -> None:
         """
         Set host and port
         :param host: VoiceVox Engine host
@@ -170,8 +170,12 @@ class VoiceVox:
         """
         Get speakers raw data
         :return: Response json
+        :raises ConnectionError: VoiceVox Engine is not running
         """
-        ret = requests.get(f'http://{cls.host}:{cls.port}/speakers')
+        try:
+            ret = requests.get(f'http://{cls.host}:{cls.port}/speakers')
+        except requests.exceptions.ConnectionError as e:
+            raise ConnectionError("VoiceVox Engine is not running") from e
         return ret.json()
 
     @classmethod
