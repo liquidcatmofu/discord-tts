@@ -1,17 +1,21 @@
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from typing import Optional
 
 import requests
+from dotenv import load_dotenv
+from urllib3.exceptions import HTTPError, MaxRetryError, NewConnectionError
 from vv_wrapper import database as db
 
-host = "127.0.0.1"
-port = 50021
 
-
-def start_engine(path: str):
-    return subprocess.Popen(path, shell=True)
+if not load_dotenv("../.env"):
+    host = "127.0.0.1"
+    port = 50021
+else:
+    host = os.getenv("VV_HOST", "127.0.0.1")
+    port = int(os.getenv("VV_PORT", 50021))
 
 
 @dataclass
@@ -174,8 +178,8 @@ class VoiceVox:
         """
         try:
             ret = requests.get(f'http://{cls.host}:{cls.port}/speakers')
-        except requests.exceptions.ConnectionError as e:
-            raise ConnectionError("VoiceVox Engine is not running") from e
+        except (HTTPError, OSError, ConnectionError, IOError, MaxRetryError, NewConnectionError, ConnectionRefusedError) as e:
+            raise RuntimeError("VoiceVox Engine is not running") from e
         return ret.json()
 
     @classmethod

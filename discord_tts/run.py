@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from util import BridgeCtx, JoinButton
 from voicemanager import VoiceManagedBot
 from vv_wrapper import database
+from vv_wrapper.start import start_engine
 
 intents = discord.Intents(
     messages=True,
@@ -22,11 +23,15 @@ intents = discord.Intents(
 
 if not load_dotenv(verbose=True):
     with open(".env", "w", encoding="utf-8") as f:
-        f.write("TOKEN=\n")
+        f.write("TOKEN=YOUR TOKEN\n")
         f.write("COMMAND_PREFIX=!\n")
         f.write("TEST_GUILD=\n")
         f.write("SHARD_COUNT=\n")
         f.write("SHARD_IDS=\n")
+        f.write("VV_HOST=127.0.0.1\n")
+        f.write("VV_PORT=50021\n")
+        f.write("VV_PATH=\n")
+        f.write("VV_ARGS=\n")
 token = os.getenv("TOKEN")
 prefix = os.getenv("COMMAND_PREFIX")
 if not token:
@@ -246,10 +251,13 @@ async def create_button(ctx: BridgeCtx):
     await ctx.respond(embed=embed, view=view)
 
 
-bot.load_extension("cog")
-
-
 def run(token: str):
+    path = os.getenv("VV_PATH")
+    print(path)
+    if path:
+        start_engine(path + " " + os.getenv("VV_ARGS", ""))
+        print("VoiceVox engine started")
+    bot.load_extension("cog")
     bot.run(token)
 
 
