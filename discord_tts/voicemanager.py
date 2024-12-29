@@ -1,15 +1,19 @@
 import io
 import re
-from queue import Empty, Queue
-from subprocess import DEVNULL
 import threading
 import time
 import warnings
+from queue import Empty, Queue
+from subprocess import DEVNULL
+from typing import Optional
+
 import discord
 from discord.ext import bridge
+
 from vv_wrapper import call, database
 
-
+UserID = int
+ChannelID = int
 GuildID = int
 
 
@@ -33,10 +37,10 @@ class VoiceManager:
         self.speak_channels: dict[GuildID, discord.VoiceChannel] = {}
         self.voice_clients: dict[GuildID, discord.VoiceClient] = {}
 
-        self.speak_message_q: Queue[discord.Message | dict[str: str | int]] = Queue()
+        self.speak_message_q: Queue[discord.Message | dict[str: str | GuildID | UserID]] = Queue()
         self.speak_source_q: Queue[discord.AudioSource] = Queue()
-        self.converter_loop: bool = True
-        self.converter_thread: threading.Thread | None = None
+        self.converter_loop: Optional[bool] = True
+        self.converter_thread: Optional[threading.Thread] = None
         self.converter_interval: float = 0.1
 
         self.user_replacers: database.ReplacerHolder = database.ReplacerHolder("user", {})
@@ -148,11 +152,11 @@ class VoiceManager:
         :return:
         """
         while self.converter_loop:
-            user_settings: database.UserSetting | None = None
-            server_settings: database.GuildSetting | None = None
-            message_type: discord.MessageType | None = None
-            ignore_users: list[int] = []
-            ignore_roles: list[int] = []
+            user_settings: Optional[database.UserSetting] = None
+            server_settings: Optional[database.GuildSetting] = None
+            message_type: Optional[discord.MessageType] = None
+            ignore_users: list[UserID] = []
+            ignore_roles: list[UserID] = []
             reply: str = ""
             try:
                 message = self.speak_message_q.get()
