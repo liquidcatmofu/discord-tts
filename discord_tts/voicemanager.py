@@ -21,10 +21,9 @@ GuildID = int
 class VoiceManagedBot(bridge.AutoShardedBot):
     """A subclass of discord.Bot that has a VoiceManager instance."""
     def __init__(self, *args, **kwargs):
-        kw = {"member_cache_flags": discord.MemberCacheFlags.none(), "chunk_guilds_at_startup": False}
-        kw.update(kwargs)
-        super().__init__(*args, **kw)
+        super().__init__(*args, **kwargs)
         self.voice_manager: VoiceManager = VoiceManager(self)
+        self.start_time: float = time.time()
 
     @property
     def voice_clients(self) -> list[VoiceClient]:

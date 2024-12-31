@@ -3,7 +3,7 @@ import queue
 import logging
 import warnings
 from logging import getLogger, DEBUG, INFO, WARNING
-from msvcrt import open_osfhandle
+from time import time
 
 import discord
 from discord import ChannelType, Embed
@@ -12,7 +12,6 @@ from discord.ext import tasks
 from discord.ext.bridge import BridgeOption
 from dotenv import load_dotenv
 
-from discord_tts.vv_wrapper.start import logger
 from util import BridgeCtx, JoinButton
 from voicemanager import VoiceManagedBot
 from vv_wrapper import database
@@ -90,15 +89,15 @@ database.DictionaryLoader.set_db_path(os.path.join(os.path.dirname(os.path.abspa
 @bot.event
 async def on_ready():
     """Event handler for bot ready."""
-    print(f"logged in as {bot.user}")
     database.SettingLoader.create_table()
     bot.add_view(JoinButton(bot, say_clock))
+    print(f"Logged in as {bot.user.name} and took {time() - bot.start_time:.2f}s")
     for guild in bot.guilds:
         database.DictionaryLoader.create_table(guild.id)
         vm.set_replacer(guild.id)
         vm.guild_settings.auto_load(guild.id, )
-
-    # await bot.change_presence()
+    if not status_update.is_running():
+        status_update.start()
 
 
 @bot.event
@@ -225,6 +224,14 @@ async def say_clock():
                 continue
 
 
+@tasks.loop(minutes=5)
+async def status_update():
+    """Update the bot's status."""
+
+    await bot.change_presence(activity=discord.Game(name=f"{len(bot.voice_clients)} / {len(bot.guilds)}サーバーで読み上げ中"))
+
+
+
 @bot.bridge_command(description="応答速度を確認する")
 async def ping(ctx: BridgeCtx):
     """Check the response time of the bot."""
@@ -256,6 +263,7 @@ async def join(
             channel = ctx.author.voice.channel
     else:
         channel = vc
+    print(channel.members)
     if len(channel.members):
         logger.info(f"connecting to {ctx.guild.id}")
         await ctx.respond(f"<#{channel.id}>に接続しました")
@@ -288,6 +296,16 @@ async def leave(ctx: BridgeCtx):
             say_clock.stop()
     else:
         await ctx.respond("接続されていません")
+
+
+@bot.bridge_command(name="cancel", description="読み上げをキャンセルする")
+async def cancel(ctx: BridgeCtx):
+    """Cancel the reading."""
+    if ctx.guild.id not in vm.read_channels:
+        await ctx.respond("接続されていません")
+        return
+    ctx.voice_client.stop()
+    await ctx.respond("読み上げをキャンセルしました", delete_after=5)
 
 
 @bot.bridge_command(name="create-button", description="参加ボタンを作成する")
