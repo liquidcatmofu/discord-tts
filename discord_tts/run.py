@@ -1,5 +1,9 @@
 import os
 import queue
+import logging
+import warnings
+from logging import getLogger, DEBUG, INFO, WARNING
+from msvcrt import open_osfhandle
 
 import discord
 from discord import ChannelType, Embed
@@ -8,10 +12,17 @@ from discord.ext import tasks
 from discord.ext.bridge import BridgeOption
 from dotenv import load_dotenv
 
+from discord_tts.vv_wrapper.start import logger
 from util import BridgeCtx, JoinButton
 from voicemanager import VoiceManagedBot
 from vv_wrapper import database
 from vv_wrapper.start import start_engine
+
+logging.basicConfig(level=WARNING)
+
+logger = getLogger(__name__)
+logger.propagate = False
+logger.setLevel(DEBUG)
 
 intents = discord.Intents(
     messages=True,
@@ -22,7 +33,9 @@ intents = discord.Intents(
 )
 
 if not load_dotenv(verbose=True):
+    logger.info("no .env file found")
     with open(".env", "w", encoding="utf-8") as f:
+        logger.info("creating .env file")
         f.write("TOKEN=YOUR TOKEN\n")
         f.write("COMMAND_PREFIX=!\n")
         f.write("TEST_GUILD=\n")
@@ -35,13 +48,13 @@ if not load_dotenv(verbose=True):
 token = os.getenv("TOKEN")
 prefix = os.getenv("COMMAND_PREFIX")
 if not token:
-    print("Failed to load token")
+    logger.error("Failed to load token")
     raise RuntimeError("Failed to load token")
 if not prefix:
-    print("Failed to load command prefix")
+    logger.error("Failed to load command prefix")
     raise RuntimeError("Failed to load command prefix")
 if os.getenv("TEST_GUILD"):
-    print("Starting as Test Bot")
+    logger.info("Starting as Test Bot")
     test_guild = [i for i in map(int, os.getenv("TEST_GUILD").split(","))]
     if os.getenv("SHARD_COUNT"):
         shard_count = int(os.getenv("SHARD_COUNT"))
@@ -52,15 +65,19 @@ if os.getenv("TEST_GUILD"):
     else:
         shard_count = len(test_guild)
         shard_ids = None
+    logger.info(f"Shard Count: {shard_count}")
+    logger.info(f"Shard IDs: {shard_ids}")
     bot = VoiceManagedBot(debug_guilds=test_guild, intents=intents, command_prefix=prefix, shard_ids=shard_ids,
                           shard_count=shard_count)
 else:
-    print("Starting as Public Bot")
+    logger.info("Starting as Public Bot")
     shard_count = int(os.getenv("SHARD_COUNT"))
     if os.getenv("SHARD_IDS"):
         shard_ids = [int(i) for i in os.getenv("SHARD_IDS").split(",")]
     else:
         shard_ids = None
+    logger.info(f"Shard Count: {shard_count}")
+    logger.info(f"Shard IDs: {shard_ids}")
     bot = VoiceManagedBot(intents=intents, command_prefix=prefix, shard_ids=shard_ids, shard_count=shard_count)
 
 vm = bot.voice_manager
@@ -74,7 +91,6 @@ database.DictionaryLoader.set_db_path(os.path.join(os.path.dirname(os.path.abspa
 async def on_ready():
     """Event handler for bot ready."""
     print(f"logged in as {bot.user}")
-    print(f"guilds: {[(g.name, g.id) for g in bot.guilds]}")
     database.SettingLoader.create_table()
     bot.add_view(JoinButton(bot, say_clock))
     for guild in bot.guilds:
@@ -88,6 +104,12 @@ async def on_ready():
 @bot.event
 async def on_message(message: discord.Message):
     """Event handler for receiving message."""
+    if vm.read_channels.get(message.guild.id) is not None:
+        if bot.voice_clients_dict.get(message.guild.id) is None:
+            bot.voice_clients_dict[message.guild.id] = bot.get_voice_client(message.guild.id)
+        if vm.speak_channels.get(message.guild.id) is None:
+            vm.speak_channels[message.guild.id] = bot.voice_clients_dict[message.guild.id].channel
+
     if message.content.startswith(prefix):
         await bot.process_commands(message)
         return
@@ -108,9 +130,10 @@ async def on_message(message: discord.Message):
     if not vm.guild_settings.get(message.guild.id).read_nonparticipation:
         if not message.author.voice:
             return
-        elif message.author.voice.channel != vm.voice_clients[message.guild.id].channel:
+        elif bot.voice_clients_dict.get(message.guild.id) is None:
             return
-    print(message.clean_content)
+        elif message.author.voice.channel != bot.voice_clients_dict[message.guild.id].channel:
+            return
     vm.speak_message_q.put(message)
 
 
@@ -125,13 +148,31 @@ async def on_guild_join(guild: discord.Guild):
 @bot.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
     """Event handler for voice state update."""
+
     guild_id = member.guild.id
-    client = vm.voice_clients.get(guild_id)
+
+    client = bot.get_voice_client(guild_id)
+
+    if client is None:
+        return
+
     if member.id == bot.user.id:
         if after.channel is None:
-            if client is not None and client.channel == before.channel:
+            if client is not None:
+                await vm.read_channels.get(guild_id).send("VCから切断されました")
                 await vm.disconnect(guild_id=guild_id)
-                print("Disconnected")
+                if not bot.voice_clients_dict:
+                    say_clock.stop()
+                return
+        else:
+            if member.guild.voice_client is not None:
+                pass
+                # bot.voice_clients_dict[guild_id] = after.channel.guild.voice_client
+            if client.channel != after.channel:
+                await vm.disconnect(guild_id=guild_id)
+                await vm.read_channels.get(guild_id).send("VCを移動されました")
+                if not bot.voice_clients_dict:
+                    say_clock.stop()
                 return
     if member.bot:
         return
@@ -153,25 +194,28 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
         if before.channel.id == client.channel.id:
             if after.channel == before.channel:
                 return
-            vm.speak(f"{replacer.replace(name)}さんが退出しました", guild=guild_id)
-            if len(client.channel.members) == 1:
+            if len(client.channel.members) < 2:
                 await vm.disconnect(guild_id)
                 say_clock.stop()
+            else:
+                vm.speak(f"{replacer.replace(name)}さんが退出しました", guild=guild_id)
             return
 
 
 @tasks.loop(seconds=0.1)
 async def say_clock():
     """Check if the bot is speaking and play the next source if it is not playing."""
-    # if not vm.voice_clients:
-    #     await vm.stop()
-    #     say_clock.stop()
-    #     return
-
-    for vc in vm.voice_clients.values():
-        if not vc.is_connected():
-            await vm.disconnect(vc.guild.id)
+    for vc in list(bot.voice_clients_dict.values()):
+        # RuntimeError: dictionary changed size during iteration
+        if vc is None:
+            warnings.warn("VoiceClient is None")
             continue
+        else:
+            if not vc.is_connected():
+                await vm.disconnect(vc.guild.id)
+                continue
+        if len(vc.channel.members) < 2:
+            await vm.disconnect(vc.guild.id)
         if not vc.is_playing():
             try:
                 source = vm.speak_source_q.get_nowait()
@@ -194,11 +238,11 @@ async def join(
         force: BridgeOption(bool, default=False, description="他で接続中でも強制的に接続させます")
 ):
     """Connect to the voice channel."""
-    client = vm.voice_clients.get(ctx.guild.id)
-    print(ctx.voice_client.channel.name if ctx.voice_client else None)
+    client = bot.voice_clients_dict.get(ctx.guild.id)
     if ctx.voice_client != client:
-        client = vm.voice_clients[ctx.guild.id] = ctx.voice_client
+        client = bot.voice_clients_dict[ctx.guild.id] = ctx.voice_client
         await ctx.respond("エラーが発生しました\n再度コマンドを実行してください")
+        logger.error("Internal Error, voice client unmatch")
     if client and not force:
         await ctx.respond(f"既に<#{client.channel.id}>に接続しています\n"
                           f"強制的に接続する場合は`force`オプションをTrueにしてください")
@@ -213,6 +257,7 @@ async def join(
     else:
         channel = vc
     if len(channel.members):
+        logger.info(f"connecting to {ctx.guild.id}")
         await ctx.respond(f"<#{channel.id}>に接続しました")
         await vm.connect(channel, ctx.guild.id)
         vm.read_channels[ctx.guild.id] = ctx.channel
@@ -230,14 +275,16 @@ async def join(
 @bot.bridge_command(description="VCを切断する")
 async def leave(ctx: BridgeCtx):
     """Disconnect from the voice channel."""
-    client = vm.voice_clients.get(ctx.guild.id)
+    client = bot.voice_clients_dict.get(ctx.guild.id)
     if ctx.voice_client != client:
-        client = vm.voice_clients[ctx.guild.id] = ctx.voice_client
+        client = bot.voice_clients_dict[ctx.guild.id] = ctx.voice_client
         await ctx.respond("エラーが発生しました\n再度コマンドを実行してください")
+        logger.error("Internal Error, voice client unmatch")
     if ctx.voice_client:
+        logger.info(f"disconnecting from {ctx.guild.id}")
         await ctx.respond(f"切断しました")
         await vm.disconnect(ctx.guild.id)
-        if not vm.voice_clients:
+        if not bot.voice_clients_dict:
             say_clock.stop()
     else:
         await ctx.respond("接続されていません")
@@ -253,10 +300,8 @@ async def create_button(ctx: BridgeCtx):
 
 def run(token: str):
     path = os.getenv("VV_PATH")
-    print(path)
     if path:
         start_engine(path + " " + os.getenv("VV_ARGS", ""))
-        print("VoiceVox engine started")
     bot.load_extension("cog")
     bot.run(token)
 

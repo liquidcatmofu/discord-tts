@@ -5,9 +5,10 @@ import time
 import warnings
 from queue import Empty, Queue
 from subprocess import DEVNULL
-from typing import Optional
+from typing import Optional, overload
 
 import discord
+from discord import VoiceProtocol, VoiceClient
 from discord.ext import bridge
 
 from vv_wrapper import call, database
@@ -20,22 +21,43 @@ GuildID = int
 class VoiceManagedBot(bridge.AutoShardedBot):
     """A subclass of discord.Bot that has a VoiceManager instance."""
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        print(self.shard_ids, self.shard_count)
+        kw = {"member_cache_flags": discord.MemberCacheFlags.none(), "chunk_guilds_at_startup": False}
+        kw.update(kwargs)
+        super().__init__(*args, **kw)
         self.voice_manager: VoiceManager = VoiceManager(self)
+
+    @property
+    def voice_clients(self) -> list[VoiceClient]:
+        return self._connection.voice_clients
+
+    def get_voice_client(self, guild_id: int) -> Optional[VoiceClient]:
+        """
+        Get the voice client for a guild.
+        :param guild_id: discord guild id
+        :return: discord.VoiceClient
+        """
+        return self._connection._voice_clients.get(guild_id)
+
+    @property
+    def voice_clients_dict(self) -> dict[GuildID, VoiceClient]:
+        """
+        Get the voice clients as a dictionary.
+        :return: dict
+        """
+        return self._connection._voice_clients
 
 
 class VoiceManager:
     """Manages voice connections and text-to-speech conversion."""
-    def __init__(self, bot: discord.Bot | discord.AutoShardedBot):
-        self.bot: discord.Bot | discord.AutoShardedBot = bot
+    def __init__(self, bot: VoiceManagedBot):
+        self.bot: VoiceManagedBot = bot
         # self.read_channel: discord.TextChannel | None = None
         # self.speak_channel: discord.VoiceChannel | None = None
         # self.voice_client: discord.VoiceClient | None = None
 
         self.read_channels: dict[GuildID, discord.TextChannel] = {}
-        self.speak_channels: dict[GuildID, discord.VoiceChannel] = {}
-        self.voice_clients: dict[GuildID, discord.VoiceClient] = {}
+        # self.speak_channels: dict[GuildID, discord.VoiceChannel] = {}
+        # self.voice_clients: dict[GuildID, discord.VoiceClient] = {}
 
         self.speak_message_q: Queue[discord.Message | dict[str: str | GuildID | UserID]] = Queue()
         self.speak_source_q: Queue[discord.AudioSource] = Queue()
@@ -48,6 +70,10 @@ class VoiceManager:
 
         self.user_settings: database.SettingHolder = database.SettingHolder("users", {})
         self.guild_settings: database.SettingHolder = database.SettingHolder("guilds", {})
+
+    @property
+    def speak_channels(self) -> dict[GuildID, discord.VoiceChannel]:
+        return {guild_id: vc.channel for guild_id, vc in self.bot.voice_clients_dict.items()}
 
     @property
     def speakers(self) -> call.SpeakersHolder:
@@ -93,7 +119,7 @@ class VoiceManager:
         """
         await self.disconnect(-1)
         self.qclear()
-        self.voice_clients.clear()
+        # self.voice_clients.clear()
         self.read_channels.clear()
         self.speak_channels.clear()
 
@@ -112,21 +138,25 @@ class VoiceManager:
         :param guild_id: discord guild id, if -1, disconnect all voice clients.
         :return:
         """
-        if self.voice_clients:
+        if self.bot.voice_clients_dict:
 
             if guild_id > 0:
-                await self.voice_clients[guild_id].disconnect()
-                self.voice_clients.pop(guild_id)
+                try:
+                    await self.bot.voice_clients_dict[guild_id].disconnect()
+                    self.read_channels.pop(guild_id)
+                    # self.voice_clients.pop(guild_id)
+                except KeyError:
+                    warnings.warn(f"Voice client not found for guild {guild_id}", RuntimeWarning)
+                    # self.bot.voice_clients_dict.pop(guild_id, None)
             else:
                 self.stop_converter()
                 self.qclear()
-                for vc in self.voice_clients.values():
+                for vc in self.bot.voice_clients_dict.values():
                     await vc.disconnect()
-                self.voice_clients.clear()
+                # self.voice_clients.clear()
             # self.start_converter()
         else:
-            warnings.warn("No voice client to disconnect", RuntimeWarning)
-            print(guild_id)
+            warnings.warn(f"No voice client to disconnect at guild {guild_id}", RuntimeWarning)
 
     async def connect(self, channel: discord.VoiceChannel, guild_id: int) -> discord.VoiceClient:
         """
@@ -135,13 +165,13 @@ class VoiceManager:
         :param guild_id: discord guild id
         :return:
         """
-        if self.voice_clients.get(guild_id) is None:
-            self.voice_clients[guild_id] = await channel.connect()
+        if self.bot.voice_clients_dict.get(guild_id) is None:
+            await channel.connect()
         else:
-            await self.voice_clients[guild_id].move_to(channel)
+            await self.bot.voice_clients_dict[guild_id].move_to(channel)
         if self.converter_thread is None or not self.converter_thread.is_alive():
             self.start_converter()
-        return self.voice_clients[guild_id]
+        return self.bot.voice_clients_dict[guild_id]
 
     def _converter(self):
         """
@@ -201,7 +231,6 @@ class VoiceManager:
                         text = text[:server_settings.read_length] + "、以下省略"
 
             text = reply + text
-            print(text)
             split = re.split("[。、\n]", text)
 
             for t in split:

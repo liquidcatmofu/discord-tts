@@ -23,17 +23,17 @@ class JoinButton(discord.ui.View):
 
     @discord.ui.button(label="参加", style=discord.ButtonStyle.green, custom_id="join_button")
     async def join_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        client = self.vm.voice_clients.get(interaction.guild.id)
+        client = self.bot.voice_clients_dict.get(interaction.guild.id)
         if self.bot.voice_clients:
             if client not in self.bot.voice_clients:
                 await interaction.response.send_message(
                     content="エラーが発生しました\n再度実行してください",
                     delete_after=10
                 )
-                for vc in self.bot.voice_clients:
-                    if vc.guild == interaction.guild:
-                        self.vm.voice_clients[interaction.guild.id] = vc
-                        break
+                # for vc in self.bot.voice_clients:
+                #     if vc.guild == interaction.guild:
+                #         self.vm.voice_clients[interaction.guild.id] = vc
+                #         break
             else:
                 await interaction.response.send_message(
                     f"既に<#{client.channel.id}>に接続しています",
@@ -47,25 +47,27 @@ class JoinButton(discord.ui.View):
         await self.vm.connect(vc, interaction.guild.id)
         await interaction.response.send_message(f"<#{vc.id}>に接続しました", delete_after=10)
         self.vm.read_channels[interaction.guild.id] = interaction.channel
-        self.vm.qclear()
+        # self.vm.qclear()
         self.vm.speak("接続しました", guild=interaction.guild.id)
-        self.start_clock.start()
-        self.vm.start_converter()
+        if not self.start_clock.is_running():
+            self.start_clock.start()
+        if self.vm.converter_thread is None or not self.vm.converter_thread.is_alive():
+            self.vm.start_converter()
 
     @discord.ui.button(label="切断", style=discord.ButtonStyle.red, custom_id="leave_button")
     async def leave_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        client = self.vm.voice_clients.get(interaction.guild.id)
+        client = self.bot.voice_clients_dict.get(interaction.guild.id)
         if self.bot.voice_clients:
             if client not in self.bot.voice_clients:
                 await interaction.response.send_message(
                     content="エラーが発生しました\n再度実行してください",
                     delete_after=10
                 )
-                for vc in self.bot.voice_clients:
-                    # bot.voice_clients is a list of VoiceClient objects
-                    if vc.guild == interaction.guild:
-                        self.vm.voice_clients[interaction.guild.id] = vc
-                        break
+                # for vc in self.bot.voice_clients:
+                #     # bot.voice_clients is a list of VoiceClient objects
+                #     if vc.guild == interaction.guild:
+                #         self.vm.voice_clients[interaction.guild.id] = vc
+                #         break
         if not client:
             await interaction.response.send_message("接続されていません", delete_after=10)
             return
