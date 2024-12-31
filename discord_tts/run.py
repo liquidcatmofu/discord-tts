@@ -83,9 +83,6 @@ vm = bot.voice_manager
 database.DictionaryLoader.set_db_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "dictionary.db"))
 
 
-# group_dictionary = SlashCommandGroup("dictionary", "辞書操作コマンド")
-
-
 @bot.event
 async def on_ready():
     """Event handler for bot ready."""
@@ -228,8 +225,8 @@ async def say_clock():
 async def status_update():
     """Update the bot's status."""
 
-    await bot.change_presence(activity=discord.Game(name=f"{len(bot.voice_clients)} / {len(bot.guilds)}サーバーで読み上げ中"))
-
+    await bot.change_presence(
+        activity=discord.Game(name=f"{len(bot.voice_clients)}/{len(bot.guilds)}サーバーで読み上げ中"))
 
 
 @bot.bridge_command(description="応答速度を確認する")
@@ -263,7 +260,6 @@ async def join(
             channel = ctx.author.voice.channel
     else:
         channel = vc
-    print(channel.members)
     if len(channel.members):
         logger.info(f"connecting to {ctx.guild.id}")
         await ctx.respond(f"<#{channel.id}>に接続しました")
