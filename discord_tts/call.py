@@ -197,7 +197,7 @@ class VoiceVox:
         return SpeakersHolder(speakers)
 
     @classmethod
-    def spekerdata(cls, speaker_uuid: str) -> dict[str:str | list | dict]:
+    def speakerdata(cls, speaker_uuid: str) -> dict[str:str | list | dict]:
         """
         Get speaker data
         :param speaker_uuid: UUID of the speaker
