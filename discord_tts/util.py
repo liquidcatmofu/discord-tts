@@ -16,6 +16,7 @@ class BridgeCtx(BridgeApplicationContext, BridgeExtContext):
 class JoinButton(discord.ui.View):
 
     def __init__(self, bot: VoiceManagedBot, clock: tasks.Loop):
+        print("JoinButton init")
         self.bot = bot
         self.vm = bot.voice_manager
         self.say_clock = clock
