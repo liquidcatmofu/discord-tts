@@ -659,7 +659,7 @@ class SettingLoader:
     """
     setting database wrapper
     """
-    file_path: str | os.PathLike = "./setting.db"
+    file_path: str | os.PathLike = "../setting.db"
 
     @classmethod
     def set_db_path(cls, path: str | os.PathLike) -> None:
