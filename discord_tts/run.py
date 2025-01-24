@@ -308,7 +308,7 @@ async def cancel(ctx: BridgeCtx):
 async def create_button(ctx: BridgeCtx):
     """Create a join button."""
     view = JoinButton(bot, say_clock)
-    embed = Embed(title="参加ボタン", description="ワンクリックでVCに参加します")
+    embed = Embed(title="参加ボタン", description="選択したチャンネルを参加中のVCで読み上げます")
     await ctx.respond(embed=embed, view=view)
 
 
