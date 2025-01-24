@@ -1,5 +1,5 @@
 import os
-import re
+import re2 as re
 import sqlite3
 from dataclasses import dataclass
 from json import loads
@@ -57,15 +57,20 @@ class Replacer:
     replace text with regex and simple replacements.
     """
 
-    def __init__(self, regex_replacements: dict[str: str], simple_replacements: dict[str: str]) -> None:
+    url_pattern = re.compile(r'https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(),]|%[0-9a-fA-F][0-9a-fA-F])+'.encode("utf8"))
+    code_block_pattern = re.compile(r'(?s)```.*?```'.encode("utf8"))
+    custom_emoji_pattern = re.compile(r'<a?:[a-zA-Z0-9_]+:[0-9]+>'.encode("utf8"))
+    sound_emoji_pattern = re.compile(r'<sound:[0-9]+:[0-9]+>'.encode("utf8"))
+
+    def __init__(self, regex_replacements: dict[str, str], simple_replacements: dict[str, str]) -> None:
         """
         Set the replacements.
         :param regex_replacements: Regex replacements
         :param simple_replacements: Simple replacements
         """
-        self.regex_replacements_str: dict[str: str] = regex_replacements
-        self.regex_replacements: dict[re.Pattern: str] = {re.compile(k): v for k, v in regex_replacements.items()}
-        self.simple_replacements: dict[str: str] = simple_replacements
+        self.regex_replacements_str: dict[str, str] = regex_replacements
+        self.regex_replacements: dict[re._Regexp, str] = {re.compile(k.encode("utf-8")): v for k, v in regex_replacements.items()}
+        self.simple_replacements: dict[str, str] = simple_replacements
 
     def replace(
             self,
@@ -83,7 +88,7 @@ class Replacer:
         """
         # 正規表現を使用する置換を一括で実行
         for before, after in self.regex_replacements.items():
-            text = before.sub(after, text)
+            text = before.sub(after.encode("utf8"), text.encode("utf8")).decode("utf8")
         # 正規表現を使用しない置換を実行
         for before, after in self.simple_replacements.items():
             text = text.replace(before, after)
@@ -92,21 +97,22 @@ class Replacer:
         if code_block_replacement:
             text = self.replace_code_blocks(text, code_block_replacement)
         text = self.replace_custom_emoji(text)
+        text = self.replace_sound_moji(text)
         return text
 
-    def update_replacements(self, regex_replacements: dict[str: str], simple_replacements: dict[str: str]) -> None:
+    def update_replacements(self, regex_replacements: dict[str, str], simple_replacements: dict[str, str]) -> None:
         """
         Update the replacements.
         :param regex_replacements: New regex replacements
         :param simple_replacements: New simple replacements
         :return: None
         """
-        self.regex_replacements_str: dict[str: str] = regex_replacements
-        self.regex_replacements: dict[re.Pattern: str] = {re.compile(k): v for k, v in regex_replacements.items()}
-        self.simple_replacements: dict[str: str] = simple_replacements
+        self.regex_replacements_str: dict[str, str] = regex_replacements
+        self.regex_replacements: dict[re._Regexp, str] = {re.compile(k.encode("utf8")): v for k, v in regex_replacements.items()}
+        self.simple_replacements: dict[str, str] = simple_replacements
 
-    @staticmethod
-    def replace_urls(text: str, replacement: str) -> str:
+    @classmethod
+    def replace_urls(cls, text: str, replacement: str) -> str:
         """
         Replace URLs in the text.
         :param text: Text to be replaced
@@ -114,16 +120,16 @@ class Replacer:
         :return: Replaced text
         """
         # URLの正規表現パターン
-        url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
-        urls = re.findall(url_pattern, text)
+        # url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+        urls = re.findall(cls.url_pattern, text)
         for url in urls:
             parsed_url = urlparse(url)
             if parsed_url.scheme and parsed_url.netloc:
                 text = text.replace(url, replacement)
         return text
 
-    @staticmethod
-    def replace_code_blocks(text: str, replacement: str) -> str:
+    @classmethod
+    def replace_code_blocks(cls, text: str, replacement: str) -> str:
         """
         Replace code blocks in the text.
         :param text: Text to be replaced
@@ -131,14 +137,13 @@ class Replacer:
         :return: Replaced text
         """
         # コードブロックの正規表現パターン
-        code_block_pattern = r'```.*?```'
-        code_blocks = re.findall(code_block_pattern, text, re.DOTALL)
+        code_blocks = re.findall(cls.code_block_pattern, text)
         for code_block in code_blocks:
             text = text.replace(code_block, replacement)
         return text
 
-    @staticmethod
-    def replace_custom_emoji(text: str, replacement: Optional[str] = None) -> str:
+    @classmethod
+    def replace_custom_emoji(cls, text: str, replacement: Optional[str] = None) -> str:
         """
         Replace custom emojis in the text.
         :param text: Text to be replaced
@@ -146,13 +151,28 @@ class Replacer:
         :return: Replaced text
         """
         # カスタム絵文字の正規表現パターン
-        emoji_pattern = r'<a?:[a-zA-Z0-9_]+:[0-9]+>'
-        emojis = re.findall(emoji_pattern, text)
+        # emoji_pattern = r'<a?:[a-zA-Z0-9_]+:[0-9]+>'
+        emojis = re.findall(cls.custom_emoji_pattern, text)
         for emoji in emojis:
             if replacement:
                 text = text.replace(emoji, replacement)
             else:
                 text = text.replace(emoji, emoji.split(":")[1])
+        return text
+
+    @classmethod
+    def replace_sound_moji(cls, text: str, replacement: str = "サウンド文字省略") -> str:
+        """
+        Replace sound emojis in the text.
+        :param text: Text to be replaced
+        :param replacement: Replacement for sound emojis, if None, replace with sound emoji name
+        :return: Replaced text
+        """
+        # サウンド文字の正規表現パターン
+        # sound_emoji_pattern = r'<sound:[0-9]+:[0-9]+>'
+        sound_emojis = re.findall(cls.sound_emoji_pattern, text)
+        for sound_emoji in sound_emojis:
+            text = text.replace(sound_emoji, replacement)
         return text
 
     def __bool__(self):
@@ -467,7 +487,7 @@ class ReplacerHolder(BaseDataHolder):
     :param table: table name ("guild" or "user")
     """
     table: str
-    _replacers: dict[int: Replacer]
+    _replacers: dict[int, Replacer]
 
     def __getitem__(self, item) -> Optional[Replacer]:
         return self._replacers[item]
@@ -557,7 +577,7 @@ class SettingHolder(BaseDataHolder):
     Setting holder class
     """
     table: str
-    _settings: dict[int: BaseSetting]
+    _settings: dict[int, BaseSetting]
 
     def __getitem__(self, item) -> GuildSetting | UserSetting | None:
         return self._settings[item]

@@ -58,7 +58,7 @@ class VoiceManager:
         # self.speak_channels: dict[GuildID, discord.VoiceChannel] = {}
         # self.voice_clients: dict[GuildID, discord.VoiceClient] = {}
 
-        self.speak_message_q: Queue[discord.Message | dict[str: str | GuildID | UserID]] = Queue()
+        self.speak_message_q: Queue[discord.Message | dict[str, str | GuildID | UserID]] = Queue()
         self.speak_source_q: Queue[discord.AudioSource] = Queue()
         self.converter_loop: Optional[bool] = True
         self.converter_thread: Optional[threading.Thread] = None
@@ -217,10 +217,10 @@ class VoiceManager:
                 if message_type == discord.MessageType.reply:
                     if server_settings.read_replyuser:
                         reply += f"{self.bot.get_message(message.reference.message_id).author.display_name}へ"
+                        reply = userdict.replace(reply)
                     reply += f"リプライ、"
 
                 user_settings = self.user_settings.get(user.id)
-                reply = userdict.replace(reply)
                 text = userdict.replace(text)
 
             if guild is not None:

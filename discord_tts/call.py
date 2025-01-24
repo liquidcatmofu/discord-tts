@@ -43,7 +43,7 @@ class Speaker:
     def __str__(self):
         return self.name
 
-    def styles_dict(self) -> dict[str: int]:
+    def styles_dict(self) -> dict[str, int]:
         """
         Return dict of styles
         speaker_name (style_name): style_id
@@ -59,7 +59,7 @@ class SpeakersHolder:
     """
     speakers: list[Speaker]
 
-    def styles(self) -> dict[str: int]:
+    def styles(self) -> dict[str, int]:
         """
         Return dict of styles
         speaker_name (style_name): style_id
@@ -197,7 +197,7 @@ class VoiceVox:
         return SpeakersHolder(speakers)
 
     @classmethod
-    def speakerdata(cls, speaker_uuid: str) -> dict[str:str | list | dict]:
+    def speakerdata(cls, speaker_uuid: str) -> dict[str, str | list | dict]:
         """
         Get speaker data
         :param speaker_uuid: UUID of the speaker
