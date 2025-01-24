@@ -1,10 +1,11 @@
 import os
-import re2 as re
 import sqlite3
 from dataclasses import dataclass
 from json import loads
 from typing import Optional
 from urllib.parse import urlparse
+
+import re2 as re
 
 
 class SQLiteWrapper:
