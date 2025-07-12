@@ -237,8 +237,9 @@ class DictionaryLoader:
         """
         db = SQLiteWrapper(cls.file_path)
         try:
-            db.execute(f"CREATE TABLE IF NOT EXISTS {type}{id} "
-                       f"(id INTEGER PRIMARY KEY AUTOINCREMENT,before TEXT UNIQUE NOT NULL , after TEXT, re INTEGER)")
+            db.execute(
+                f"CREATE TABLE IF NOT EXISTS {type}{id} "
+                f"(id INTEGER PRIMARY KEY AUTOINCREMENT,before TEXT UNIQUE NOT NULL , after TEXT, re INTEGER)")
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -268,8 +269,10 @@ class DictionaryLoader:
         db = SQLiteWrapper(cls.file_path)
         create = False
         try:
-            db.execute(f"INSERT INTO {type}{id} (before, after, re) VALUES (?, ?, ?)",
-                       (before, after, use_re))
+            db.execute(
+                f"INSERT INTO {type}{id} (before, after, re) VALUES (?, ?, ?)",
+                (before, after, use_re)
+            )
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -297,8 +300,10 @@ class DictionaryLoader:
         """
         db = SQLiteWrapper(cls.file_path)
         try:
-            db.execute(f"DELETE FROM {type}{id} WHERE before = ?",
-                       (before,))
+            db.execute(
+                f"DELETE FROM {type}{id} WHERE before = ?",
+                (before,)
+            )
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -333,8 +338,10 @@ class DictionaryLoader:
         db = SQLiteWrapper(cls.file_path)
         create = False
         try:
-            db.execute(f"UPDATE {type}{id} SET before = ?, after = ?, re = ? WHERE before = ?",
-                       (new_before, after, use_re, old_before))
+            db.execute(
+                f"UPDATE {type}{id} SET before = ?, after = ?, re = ? WHERE before = ?",
+                (new_before, after, use_re, old_before)
+            )
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -391,8 +398,10 @@ class DictionaryLoader:
         """
         db = SQLiteWrapper(cls.file_path)
         try:
-            data = db.execute(f"SELECT * FROM {type}{id} WHERE before = ?",
-                              (before,))
+            data = db.execute(
+                f"SELECT * FROM {type}{id} WHERE before = ?",
+                (before,)
+            )
         except sqlite3.OperationalError as e:
             raise e
         finally:
@@ -679,14 +688,18 @@ class SettingLoader:
         """
         db = SQLiteWrapper(cls.file_path)
         try:
-            db.execute(f"CREATE TABLE IF NOT EXISTS users "
-                       f"(id INTEGER PRIMARY KEY , speaker INTEGER NOT NULL ,"
-                       f" speed REAL , pitch REAL, intonation REAL, volume REAL , use_dict_name INTEGER)")
-            db.execute(f"CREATE TABLE IF NOT EXISTS guilds "
-                       f"(id INTEGER PRIMARY KEY , speaker INTEGER NOT NULL , speed REAL , pitch REAL, intonation REAL,"
-                       f" volume REAL , force_setting INTEGER , force_speaker INTEGER , read_joinleave INTEGER ,"
-                       f" read_length INTEGER , read_nonparticipation INTEGER , read_replyuser INTEGER ,"
-                       f"  ignore_users TEXT , ignore_roles TEXT , read_nick INTEGER)")
+            db.execute(
+                f"CREATE TABLE IF NOT EXISTS users "
+                f"(id INTEGER PRIMARY KEY , speaker INTEGER NOT NULL ,"
+                f" speed REAL , pitch REAL, intonation REAL, volume REAL , use_dict_name INTEGER)"
+            )
+            db.execute(
+                f"CREATE TABLE IF NOT EXISTS guilds "
+                f"(id INTEGER PRIMARY KEY , speaker INTEGER NOT NULL , speed REAL , pitch REAL, intonation REAL,"
+                f" volume REAL , force_setting INTEGER , force_speaker INTEGER , read_joinleave INTEGER ,"
+                f" read_length INTEGER , read_nonparticipation INTEGER , read_replyuser INTEGER ,"
+                f"  ignore_users TEXT , ignore_roles TEXT , read_nick INTEGER)"
+            )
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -707,31 +720,37 @@ class SettingLoader:
         """
         db = SQLiteWrapper(cls.file_path)
         if table == "users":
-            datas = {"speaker": 3, "speed": 1.1, "pitch": 0.0, "intonation": 1.0, "volume": 1.0, "use_dict_name": 0}
+            data = {
+                "speaker": 3, "speed": 1.1, "pitch": 0.0, "intonation": 1.0, "volume": 1.0, "use_dict_name": 0
+            }
         elif table == "guilds":
-            datas = {"speaker": 3, "speed": 1.1, "pitch": 0.0, "intonation": 1.0, "volume": 1.0, "force_setting": 0,
-                     "force_speaker": 0, "read_joinleave": 1, "read_length": 100, "read_nonparticipation": 0,
-                     "read_replyuser": 0, "ignore_users": "[]", "ignore_roles": "[]", "read_nick": 1}
+            data = {
+                "speaker": 3, "speed": 1.1, "pitch": 0.0, "intonation": 1.0, "volume": 1.0, "force_setting": 0,
+                "force_speaker": 0, "read_joinleave": 1, "read_length": 100, "read_nonparticipation": 0,
+                "read_replyuser": 0, "ignore_users": "[]", "ignore_roles": "[]", "read_nick": 1
+            }
         else:
             raise ValueError(f"table name {table} is invalid")
-        datas.update(kwargs)
+        data.update(kwargs)
         try:
             if table == "users":
                 db.execute(
                     f"INSERT INTO {table} (id, speaker, speed, pitch, intonation, volume, use_dict_name) "
                     f"VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (id, datas["speaker"], datas["speed"], datas["pitch"], datas["intonation"], datas["volume"],
-                     datas["use_dict_name"]))
+                    (id, data["speaker"], data["speed"], data["pitch"], data["intonation"], data["volume"],
+                    data["use_dict_name"])
+                )
             elif table == "guilds":
                 db.execute(
                     f"INSERT INTO {table} (id, speaker, speed, pitch, intonation, volume, force_setting, force_speaker,"
                     f" read_joinleave, read_length, read_nonparticipation, read_replyuser, ignore_users, ignore_roles,"
                     f" read_nick) "
                     f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (id, datas["speaker"], datas["speed"], datas["pitch"], datas["intonation"], datas["volume"],
-                     datas["force_setting"], datas["force_speaker"], datas["read_joinleave"], datas["read_length"],
-                     datas["read_nonparticipation"], datas["read_replyuser"], datas["ignore_users"],
-                     datas["ignore_roles"], datas["read_nick"]))
+                    (id, data["speaker"], data["speed"], data["pitch"], data["intonation"], data["volume"],
+                    data["force_setting"], data["force_speaker"], data["read_joinleave"], data["read_length"],
+                    data["read_nonparticipation"], data["read_replyuser"], data["ignore_users"],
+                    data["ignore_roles"], data["read_nick"])
+                )
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -754,8 +773,10 @@ class SettingLoader:
         """
         db = SQLiteWrapper(cls.file_path)
         try:
-            db.execute(f"DELETE FROM {table} WHERE id = ?",
-                       (id,))
+            db.execute(
+                f"DELETE FROM {table} WHERE id = ?",
+                (id,)
+            )
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -782,8 +803,10 @@ class SettingLoader:
         db = SQLiteWrapper(cls.file_path)
         create = False
         try:
-            db.execute(f"UPDATE {table} SET {column} = ? WHERE id = ?",
-                       (value, id))
+            db.execute(
+                f"UPDATE {table} SET {column} = ? WHERE id = ?",
+                (value, id)
+            )
             db.commit()
         except sqlite3.OperationalError as e:
             db.rollback()
@@ -813,8 +836,10 @@ class SettingLoader:
         create = False
         data: list[tuple] | None = None
         try:
-            data = db.execute(f"SELECT * FROM {table} WHERE id = ?",
-                              (id,))
+            data = db.execute(
+                f"SELECT * FROM {table} WHERE id = ?",
+                (id,)
+            )
         except sqlite3.OperationalError as e:
             db.rollback()
             if auto_crate:

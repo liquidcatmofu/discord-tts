@@ -248,8 +248,10 @@ async def join(
         await ctx.respond("エラーが発生しました\n再度コマンドを実行してください")
         logger.error("Internal Error, voice client unmatch")
     if client and not force:
-        await ctx.respond(f"既に<#{client.channel.id}>に接続しています\n"
-                          f"強制的に接続する場合は`force`オプションをTrueにしてください")
+        await ctx.respond(
+            f"既に<#{client.channel.id}>に接続しています\n"
+            f"強制的に接続する場合は`force`オプションをTrueにしてください"
+        )
         return
 
     if vc is None:
