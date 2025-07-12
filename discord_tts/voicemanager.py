@@ -90,7 +90,7 @@ class VoiceManager:
         :return: UserSetting object
         """
         if self.user_settings.get(user_id) is None:
-            self.user_settings[user_id] = database.SettingLoader.smart_fetch("users", user_id, True)
+            self.user_settings[user_id] = database.SettingLoader.fetch_settings_dataclass("users", user_id, True)
         return self.user_settings[user_id]
 
     def set_replacer(self, guild_id: int) -> None:

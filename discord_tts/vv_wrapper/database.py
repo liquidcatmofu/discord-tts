@@ -606,7 +606,7 @@ class SettingHolder(BaseDataHolder):
         """
         i = self._settings.get(id)
         if i is None and auto_fetch:
-            self._settings[id] = SettingLoader.smart_fetch(self.table, id, auto_create)
+            self._settings[id] = SettingLoader.fetch_settings_dataclass(self.table, id, auto_create)
             return self._settings.get(id)
         return self._settings.get(id)
 
@@ -630,7 +630,7 @@ class SettingHolder(BaseDataHolder):
         :param id: Discord guild id or user id
         :return: None
         """
-        self.set(id, SettingLoader.smart_fetch(self.table, id, True))
+        self.set(id, SettingLoader.fetch_settings_dataclass(self.table, id, True))
 
     def add(self, id: int, **kwargs):
         """
@@ -823,6 +823,44 @@ class SettingLoader:
             cls.add_setting(table, id, column=value)
 
     @classmethod
+    def import_settings(cls, table: str, id: int, data: dict) -> None:
+        """
+        Import settings from dictionary.
+        :param table: Table name ("guilds" or "users")
+        :param data: Dictionary of settings
+        :return: None
+        """
+        db = SQLiteWrapper(cls.file_path)
+        data.pop("id", None)
+
+        try:
+            if table == "guilds":
+                db.execute(
+                    f"INSERT OR REPLACE INTO {table} (id, speaker, speed, pitch, intonation, volume, "
+                    f"force_setting, force_speaker, read_joinleave, read_length, read_nonparticipation, "
+                    f"read_replyuser, ignore_users, ignore_roles, read_nick) "
+                    f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        id, data.get("speaker", 3), data.get("speed", 1.1), data.get("pitch", 0.0),
+                        data.get("intonation", 1.0), data.get("volume", 1.0), data.get("force_setting", 0),
+                        data.get("force_speaker", 0), data.get("read_joinleave", 1),
+                        data.get("read_length", 100), data.get("read_nonparticipation", 0),
+                        data.get("read_replyuser", 0), str(data.get("ignore_users", [])),
+                        str(data.get("ignore_roles", [])), data.get("read_nick", 1)
+                    )
+                )
+
+            db.commit()
+        except sqlite3.OperationalError as e:
+            db.rollback()
+            raise e
+        except sqlite3.IntegrityError as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+    @classmethod
     def fetch_settings(cls, table: str, id: int, auto_crate: bool = False) -> list[tuple] | None:
 
         """
@@ -857,7 +895,7 @@ class SettingLoader:
             return data
 
     @classmethod
-    def smart_fetch(cls, table: str, id: int, auto_create: bool = False) -> GuildSetting | UserSetting | None:
+    def fetch_settings_dataclass(cls, table: str, id: int, auto_create: bool = False) -> GuildSetting | UserSetting | None:
         """
         Fetch setting from database and create Setting object.
         :param id: Discord guild id or user id

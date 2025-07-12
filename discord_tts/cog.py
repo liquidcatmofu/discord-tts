@@ -1,8 +1,10 @@
+from dataclasses import asdict
+from io import StringIO
 from json import dumps
 from math import ceil
 
 import discord
-from discord import Embed
+from discord import Embed, File
 from discord.ext import commands, bridge
 from discord.ext.bridge import BridgeContext, BridgeOption
 from discord.ext.pages import Paginator, Page
@@ -147,10 +149,11 @@ class UserCommands(commands.Cog):
         self.vm.user_settings.update(user_id, "volume", volume)
         await ctx.respond(f"<@{ctx.author.id}>さんの音量を{volume}に変更しました")
 
-    @user_setting.command(name="show-setting", description="参加/退出読み上げを変更")
+    @user_setting.command(name="show-setting", description="ユーザー設定を表示")
     async def show_setting(
             self,
-            ctx: BridgeCtx
+            ctx: BridgeCtx,
+            json: BridgeOption(bool, "JSON形式で表示するか", default=True)
     ):
         user_id = ctx.author.id
         setting = self.vm.get_user_setting(user_id)
@@ -159,15 +162,24 @@ class UserCommands(commands.Cog):
             if v == setting.speaker:
                 speaker = k
                 break
-        embed = Embed(
-            title=f"{ctx.author.display_name}の設定",
-            description=f"話者: {speaker}\n"
-                        f"再生速度: {setting.speed}\n"
-                        f"音程: {setting.pitch}\n"
-                        f"抑揚: {setting.intonation}\n"
-                        f"音量: {setting.volume}"
-        )
-        await ctx.respond(embed=embed)
+
+        if json:
+            settings = asdict(setting)
+            await ctx.respond(
+                f"<@{ctx.author.id}>の設定"
+                f"```json\n{dumps(settings, indent=2)}\n```"
+            )
+
+        else:
+            embed = Embed(
+                title=f"<@{ctx.author.id}>の設定",
+                description=f"話者: {speaker}\n"
+                            f"再生速度: {setting.speed}\n"
+                            f"音程: {setting.pitch}\n"
+                            f"抑揚: {setting.intonation}\n"
+                            f"音量: {setting.volume}"
+            )
+            await ctx.respond(embed=embed)
 
     @user_dictionary.command(name="add", description="ユーザー辞書を追加する")
     async def add(
@@ -206,7 +218,8 @@ class UserCommands(commands.Cog):
     @user_dictionary.command(name="list", description="ユーザー辞書を表示する")
     async def list(
             self,
-            ctx: BridgeCtx
+            ctx: BridgeCtx,
+            json: BridgeOption(bool, "JSON形式で表示するか", default=True)
     ):
         user_id = ctx.author.id
         self.vm.user_replacers.auto_load(user_id)
@@ -215,8 +228,24 @@ class UserCommands(commands.Cog):
             await ctx.respond("辞書が存在しません")
             return
         await ctx.respond(f"{len(data)}件の辞書が登録されています")
-        pagenator = list_pagination(data.regex_replacements_str, data.simple_replacements)
-        await pagenator.respond(ctx)
+        if json:
+            file = dumps(
+                {
+                    "regex": data.regex_replacements_str,
+                    "simple": data.simple_replacements,
+                },
+                indent=2,
+                ensure_ascii=False
+            )
+            file = StringIO(file)
+            file.seek(0)
+            await ctx.send(
+                f"<@{ctx.author.id}>のユーザー辞書",
+                file=File(file, filename=f"{ctx.author.id}_user_dictionary.json")
+            )
+        else:
+            pagenator = list_pagination(data.regex_replacements_str, data.simple_replacements)
+            await pagenator.respond(ctx)
 
     @user_dictionary.command(name="update", description="ユーザー辞書を更新する")
     async def update(
@@ -458,7 +487,8 @@ class GuildCommands(commands.Cog):
     @guild_setting.command(name="show-setting", description="サーバー設定を表示")
     async def show_setting(
             self,
-            ctx: BridgeCtx
+            ctx: BridgeCtx,
+            json: BridgeOption(bool, "JSON形式で表示するか", default=True)
     ):
         guild_id = ctx.guild.id
         setting = self.vm.guild_settings.get(guild_id)
@@ -467,21 +497,28 @@ class GuildCommands(commands.Cog):
             if v == setting.speaker:
                 speaker = k
                 break
-        embed = Embed(
-            title=f"{ctx.guild.name}の設定",
-            description=f"話者: `{speaker}`\n"
-                        f"再生速度: `{setting.speed}`\n"
-                        f"音程: `{setting.pitch}`\n"
-                        f"抑揚: `{setting.intonation}`\n"
-                        f"音量: `{setting.volume}`\n"
-                        f"参加/退出読み上げ: `{bool(setting.read_joinleave)}`\n"
-                        f"VC未参加ユーザー読み上げ: `{bool(setting.read_nonparticipation)}`\n"
-                        f"リプライユーザー読み上げ: `{bool(setting.read_replyuser)}`\n"
-                        f"ニックネーム使用: `{bool(setting.read_nick)}`\n"
-                        f"除外ユーザー: `{len(setting.ignore_users)}`人\n"
-                        f"除外ロール: `{len(setting.ignore_roles)}`個"
-        )
-        await ctx.respond(embed=embed)
+        if json:
+            settings = asdict(setting)
+            await ctx.respond(
+                f"{ctx.guild.name}の設定"
+                f"```json\n{dumps(settings, indent=2)}\n```"
+            )
+        else:
+            embed = Embed(
+                title=f"{ctx.guild.name}の設定",
+                description=f"話者: `{speaker}`\n"
+                            f"再生速度: `{setting.speed}`\n"
+                            f"音程: `{setting.pitch}`\n"
+                            f"抑揚: `{setting.intonation}`\n"
+                            f"音量: `{setting.volume}`\n"
+                            f"参加/退出読み上げ: `{bool(setting.read_joinleave)}`\n"
+                            f"VC未参加ユーザー読み上げ: `{bool(setting.read_nonparticipation)}`\n"
+                            f"リプライユーザー読み上げ: `{bool(setting.read_replyuser)}`\n"
+                            f"ニックネーム使用: `{bool(setting.read_nick)}`\n"
+                            f"除外ユーザー: `{len(setting.ignore_users)}`人\n"
+                            f"除外ロール: `{len(setting.ignore_roles)}`個"
+            )
+            await ctx.respond(embed=embed)
 
     # async def dictionary_autocomplete(self, ctx: discord.AutocompleteContext):
     #     return list(self.vm.guild_replacers.get(ctx.guild.id).keys())
@@ -523,15 +560,32 @@ class GuildCommands(commands.Cog):
     @guild_dictionary.command(name="list", description="辞書を表示する")
     async def dictionary_list(
             self,
-            ctx: BridgeCtx
+            ctx: BridgeCtx,
+            json: BridgeOption(bool, "JSON形式で表示するか", default=True)
     ):
         data = self.vm.guild_replacers.get(ctx.guild.id)
         if not data:
             await ctx.respond("辞書が存在しません")
             return
         await ctx.respond(f"{len(data)}件の辞書が登録されています")
-        pagenator = list_pagination(data.regex_replacements_str, data.simple_replacements)
-        await pagenator.respond(ctx)
+        if json:
+            file = dumps(
+                {
+                    "regex": data.regex_replacements_str,
+                    "simple": data.simple_replacements,
+                },
+                indent=2,
+                ensure_ascii=False
+            )
+            file = StringIO(file)
+            file.seek(0)
+            await ctx.send(
+                f"<@{ctx.author.id}>のユーザー辞書",
+                file=File(file, filename=f"{ctx.author.id}_guild_dictionary.json")
+            )
+        else:
+            pagenator = list_pagination(data.regex_replacements_str, data.simple_replacements)
+            await pagenator.respond(ctx)
 
     @guild_dictionary.command(name="update", description="辞書を更新する")
     async def update(
